@@ -15,9 +15,19 @@ const handleResponse = (data, error, customErrorMessage) => {
 // ── AUTH (Manejado por Supabase Auth en AuthContext, pero exportamos firmas compatibles) ──
 // Ahora Supabase Auth se encarga del login, pero mantenemos compatibilidad por si se usa.
 export const sendMagicLink = async (email) => {
-  const { error } = await supabase.auth.signInWithOtp({ email });
+  const { error } = await supabase.auth.signInWithOtp({
+    email,
+    options: { shouldCreateUser: true }
+  });
   if (error) throw new Error(error.message);
   return { success: true };
+};
+
+export const registerUser = async (email, password) => {
+  const { data, error } = await supabase.auth.signUp({ email, password });
+  if (error) throw new Error(error.message);
+  if (!data.user) throw new Error('No se pudo crear la cuenta');
+  return { email: data.user.email, name: data.user.email.split('@')[0] };
 };
 
 export const verifyToken = async (email, token) => {
@@ -59,12 +69,13 @@ export const getGroups = async (userEmail) => {
   if (error) return handleResponse(null, error, 'Error al obtener grupos');
   
   // Formatear salida para compatibilidad
-  return data.map(item => ({
+  const groups = data.map(item => ({
     group_id: item.group_id,
     name: item.groups.name,
     created_by: item.groups.created_by,
     created_at: item.groups.created_at
   }));
+  return { groups };
 };
 
 export const createGroup = async (name, createdBy) => {
@@ -106,21 +117,33 @@ export const getGroupDetails = async (groupId) => {
 
 export const inviteMember = async (groupId, email) => {
   const lowerEmail = email.toLowerCase().trim();
-  
-  // Asegurarnos de que el perfil exista en la app para poder añadirlo como FK
+
+  // Asegurarnos de que el perfil exista (para poder añadirlo como FK)
   const { data: profile } = await supabase.from('profiles').select('email').eq('email', lowerEmail).single();
   if (!profile) {
     await supabase.from('profiles').insert([{ email: lowerEmail, name: lowerEmail.split('@')[0] }]);
   }
 
+  // Añadir al grupo
   const { error } = await supabase
     .from('group_members')
     .insert([{ group_id: groupId, user_email: lowerEmail }]);
-    
-  if (error && error.code !== '23505') { // Ignorar error de duplicado (ya es miembro)
+
+  if (error && error.code !== '23505') {
     return handleResponse(null, error, 'Error al invitar miembro');
   }
-  
+
+  // Enviar OTP de invitación (el email llega con el código para que creen su cuenta)
+  try {
+    await supabase.auth.signInWithOtp({
+      email: lowerEmail,
+      options: { shouldCreateUser: true }
+    });
+  } catch (_) {
+    // Si falla el email, no bloqueamos (el miembro ya fue añadido al grupo)
+    console.warn('No se pudo enviar email de invitación a', lowerEmail);
+  }
+
   return { success: true };
 };
 

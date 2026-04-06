@@ -1,49 +1,57 @@
 // src/pages/LoginPage.jsx
 import { useState, useRef, useEffect } from 'react';
-import { sendMagicLink, verifyToken, loginWithPassword, setPassword } from '../services/api';
+import { sendMagicLink, verifyToken, loginWithPassword, registerUser } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../components/ui/Toast';
 
-// Pasos: 'password' | 'otp_email' | 'otp_code' | 'set_password'
+// Modos: 'login' | 'register' | 'otp_email' | 'otp_code' | 'verify_email'
 export default function LoginPage() {
   const { login } = useAuth();
   const toast = useToast();
 
-  const [step,          setStep]          = useState('password');
-  const [email,         setEmail]         = useState('');
-  const [password,      setPassword_]     = useState('');
-  const [otp,           setOtp]           = useState(['', '', '', '', '', '']);
-  const [newPass,       setNewPass]       = useState('');
-  const [newPassConf,   setNewPassConf]   = useState('');
-  const [showPass,      setShowPass]      = useState(false);
-  const [loading,       setLoading]       = useState(false);
-  const [resendTimer,   setResendTimer]   = useState(0);
-  const [verifiedEmail, setVerifiedEmail] = useState('');
+  const [mode,      setMode]      = useState('login'); // login | register
+  const [step,      setStep]      = useState('form');  // form | otp_code | verify_email
+  const [email,     setEmail]     = useState('');
+  const [password,  setPassword_] = useState('');
+  const [passConf,  setPassConf]  = useState('');
+  const [otp,       setOtp]       = useState(['', '', '', '', '', '']);
+  const [showPass,  setShowPass]  = useState(false);
+  const [loading,   setLoading]   = useState(false);
+  const [resendTimer, setResendTimer] = useState(0);
   const inputsRef = useRef([]);
 
   // Countdown reenvío OTP
   useEffect(() => {
     if (resendTimer <= 0) return;
-    const t = setTimeout(() => setResendTimer((c) => c - 1), 1000);
+    const t = setTimeout(() => setResendTimer(c => c - 1), 1000);
     return () => clearTimeout(t);
   }, [resendTimer]);
 
   // ── Login con contraseña ─────────────────────────────────────
-  const handlePasswordLogin = async (e) => {
+  const handleLogin = async (e) => {
     e.preventDefault();
-    if (!email.trim() || !password) return;
     setLoading(true);
     try {
       const data = await loginWithPassword(email.trim().toLowerCase(), password);
       login({ email: data.email, name: data.name });
     } catch (err) {
-      // Si el error es que no tiene contraseña, llevar al flujo OTP
-      if (err.message?.includes('Sin contrasena') || err.message?.includes('no encontrado')) {
-        toast('No tienes contraseña configurada. Usa el código por email.', 'info');
-        setStep('otp_email');
-      } else {
-        toast(err.message || 'Contraseña incorrecta', 'error');
-      }
+      toast(err.message || 'Email o contraseña incorrectos', 'error');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // ── Registro con contraseña ──────────────────────────────────
+  const handleRegister = async (e) => {
+    e.preventDefault();
+    if (password !== passConf) { toast('Las contraseñas no coinciden', 'error'); return; }
+    if (password.length < 6)   { toast('Mínimo 6 caracteres', 'error'); return; }
+    setLoading(true);
+    try {
+      await registerUser(email.trim().toLowerCase(), password);
+      setStep('verify_email'); // Supabase envía confirmación al correo
+    } catch (err) {
+      toast(err.message || 'Error al crear cuenta', 'error');
     } finally {
       setLoading(false);
     }
@@ -74,31 +82,11 @@ export default function LoginPage() {
     setLoading(true);
     try {
       const data = await verifyToken(email.trim().toLowerCase(), full);
-      setVerifiedEmail(data.email);
-
-      // Preguntamos si quiere crear contraseña
       login({ email: data.email, name: data.name });
-      setStep('set_password');
     } catch (err) {
       toast(err.message || 'Código incorrecto', 'error');
       setOtp(['', '', '', '', '', '']);
       setTimeout(() => inputsRef.current[0]?.focus(), 100);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // ── Establecer contraseña ────────────────────────────────────
-  const handleSetPassword = async (e) => {
-    e.preventDefault();
-    if (newPass !== newPassConf) { toast('Las contraseñas no coinciden', 'error'); return; }
-    setLoading(true);
-    try {
-      await setPassword(verifiedEmail || email, newPass);
-      toast('¡Contraseña guardada! Ya puedes entrar con ella 🎉');
-      // La sesión ya está activa (login se llamó en handleVerifyOtp)
-    } catch (err) {
-      toast(err.message || 'Error al guardar contraseña', 'error');
     } finally {
       setLoading(false);
     }
@@ -111,7 +99,7 @@ export default function LoginPage() {
     next[idx] = val;
     setOtp(next);
     if (val && idx < 5) inputsRef.current[idx + 1]?.focus();
-    if (next.every((d) => d !== '')) handleVerifyOtp(next.join(''));
+    if (next.every(d => d !== '')) handleVerifyOtp(next.join(''));
   };
   const handleOtpKeyDown = (idx, e) => {
     if (e.key === 'Backspace' && !otp[idx] && idx > 0) inputsRef.current[idx - 1]?.focus();
@@ -121,7 +109,9 @@ export default function LoginPage() {
     if (p.length === 6) { setOtp(p.split('')); handleVerifyOtp(p); }
   };
 
-  // ── Decoración de fondo ──────────────────────────────────────
+  const resetToLogin = () => { setMode('login'); setStep('form'); setOtp(['','','','','','']); };
+
+  // ── Fondo decorativo ─────────────────────────────────────────
   const Bg = () => (
     <>
       <div style={{ position:'fixed', top:'-20%', left:'-20%', width:'60%', height:'60%',
@@ -134,49 +124,30 @@ export default function LoginPage() {
   );
 
   const Logo = () => (
-    <div className="logo" style={{ justifyContent:'center', marginBottom:40 }}>
+    <div className="logo" style={{ justifyContent:'center', marginBottom:36 }}>
       <div className="logo-icon">💸</div>
       <span className="logo-text">SplitGroup</span>
     </div>
   );
 
   // ════════════════════════════════════════════════════════════
-  // PASO: Configurar contraseña (tras verificar OTP por primera vez)
+  // PASO: Confirmar email tras registro
   // ════════════════════════════════════════════════════════════
-  if (step === 'set_password') {
+  if (step === 'verify_email') {
     return (
       <div className="page" style={{ justifyContent:'center', minHeight:'100dvh' }}>
         <Bg />
-        <div className="container animate-slide-up" style={{ position:'relative', zIndex:1, padding:'32px 24px' }}>
+        <div className="container animate-slide-up" style={{ position:'relative', zIndex:1, padding:'32px 24px', textAlign:'center' }}>
           <Logo />
-          <div style={{ textAlign:'center', marginBottom:28 }}>
-            <div style={{ fontSize:'2.5rem', marginBottom:8 }}>🔑</div>
-            <h1 style={{ fontSize:'1.4rem', marginBottom:8 }}>Crea tu contraseña</h1>
-            <p style={{ color:'var(--text-secondary)', fontSize:'0.9rem' }}>
-              Para la próxima vez entra directo sin necesitar un código
-            </p>
-          </div>
-
-          <div className="card" style={{ marginBottom:12 }}>
-            <form onSubmit={handleSetPassword} style={{ display:'flex', flexDirection:'column', gap:14 }}>
-              <div className="input-group">
-                <label className="input-label" htmlFor="new-pass">Nueva contraseña</label>
-                <input id="new-pass" className="input" type="password" placeholder="Mínimo 6 caracteres"
-                  value={newPass} onChange={(e) => setNewPass(e.target.value)} required autoFocus />
-              </div>
-              <div className="input-group">
-                <label className="input-label" htmlFor="new-pass-conf">Confirmar contraseña</label>
-                <input id="new-pass-conf" className="input" type="password" placeholder="Repite la contraseña"
-                  value={newPassConf} onChange={(e) => setNewPassConf(e.target.value)} required />
-              </div>
-              <button id="save-password-btn" type="submit" className={`btn btn-primary btn-full ${loading ? 'btn-disabled':''}`}
-                disabled={loading || newPass.length < 6}>
-                {loading ? '⚡ Guardando...' : '✅ Guardar contraseña'}
-              </button>
-            </form>
-          </div>
-          <button className="btn btn-ghost btn-full" onClick={() => setStep('password')}>
-            Omitir por ahora →
+          <div style={{ fontSize:'3rem', marginBottom:16 }}>📧</div>
+          <h1 style={{ fontSize:'1.5rem', marginBottom:12 }}>Revisa tu correo</h1>
+          <p style={{ color:'var(--text-secondary)', marginBottom:24 }}>
+            Enviamos un email de confirmación a{' '}
+            <strong style={{ color:'var(--primary-light)' }}>{email}</strong>.
+            <br />Haz clic en el enlace para activar tu cuenta.
+          </p>
+          <button className="btn btn-ghost btn-full" onClick={resetToLogin}>
+            ← Volver al inicio
           </button>
         </div>
       </div>
@@ -194,37 +165,36 @@ export default function LoginPage() {
           <Logo />
           <div style={{ textAlign:'center', marginBottom:28 }}>
             <div style={{ fontSize:'2.5rem', marginBottom:8 }}>📱</div>
-            <h1 style={{ fontSize:'1.4rem', marginBottom:8 }}>Revisa tu correo</h1>
+            <h1 style={{ fontSize:'1.4rem', marginBottom:8 }}>Código enviado</h1>
             <p style={{ color:'var(--text-secondary)', fontSize:'0.9rem' }}>
-              Código enviado a <strong style={{ color:'var(--primary-light)' }}>{email}</strong>
+              Revisa el correo de <strong style={{ color:'var(--primary-light)' }}>{email}</strong>
             </p>
           </div>
-
           <div className="card" style={{ marginBottom:12 }}>
             <div onPaste={handleOtpPaste} style={{ display:'flex', gap:8, justifyContent:'center', marginBottom:20 }}>
               {otp.map((digit, i) => (
-                <input key={i} ref={(el) => (inputsRef.current[i] = el)} id={`otp-${i}`}
+                <input key={i} ref={el => inputsRef.current[i] = el} id={`otp-${i}`}
                   type="text" inputMode="numeric" maxLength={1} value={digit}
-                  onChange={(e) => handleOtpChange(i, e.target.value)}
-                  onKeyDown={(e) => handleOtpKeyDown(i, e)}
+                  onChange={e => handleOtpChange(i, e.target.value)}
+                  onKeyDown={e => handleOtpKeyDown(i, e)}
                   style={{ width:46, height:56, textAlign:'center', fontSize:'1.5rem',
                     fontWeight:700, fontFamily:'monospace', background:'var(--bg-card)',
                     border:`2px solid ${digit ? 'var(--primary)' : 'var(--border)'}`,
                     borderRadius:10, color:'var(--text-primary)', outline:'none',
-                    transition:'border-color 0.2s', caretColor:'var(--primary)' }} />
+                    transition:'border-color 0.2s' }} />
               ))}
             </div>
-            <button id="verify-otp-btn" className={`btn btn-primary btn-full ${loading||otp.join('').length<6?'btn-disabled':''}`}
+            <button id="verify-otp-btn"
+              className={`btn btn-primary btn-full ${(loading || otp.join('').length < 6) ? 'btn-disabled':''}`}
               disabled={loading || otp.join('').length < 6} onClick={() => handleVerifyOtp()}>
               {loading ? '⚡ Verificando...' : '✅ Verificar código'}
             </button>
           </div>
-
           <div style={{ display:'flex', flexDirection:'column', alignItems:'center', gap:10 }}>
             <button className="btn btn-ghost" disabled={resendTimer > 0} onClick={handleSendOtp}>
               {resendTimer > 0 ? `Reenviar en ${resendTimer}s` : '🔄 Reenviar código'}
             </button>
-            <button className="btn btn-ghost" onClick={() => setStep('otp_email')}>← Cambiar email</button>
+            <button className="btn btn-ghost" onClick={resetToLogin}>← Volver</button>
           </div>
         </div>
       </div>
@@ -232,46 +202,7 @@ export default function LoginPage() {
   }
 
   // ════════════════════════════════════════════════════════════
-  // PASO: Enviar código por email (sin contraseña)
-  // ════════════════════════════════════════════════════════════
-  if (step === 'otp_email') {
-    return (
-      <div className="page" style={{ justifyContent:'center', minHeight:'100dvh' }}>
-        <Bg />
-        <div className="container animate-slide-up" style={{ position:'relative', zIndex:1, padding:'32px 24px' }}>
-          <Logo />
-          <div style={{ textAlign:'center', marginBottom:28 }}>
-            <h1 style={{ fontSize:'1.5rem', marginBottom:8 }}>Acceso por código</h1>
-            <p style={{ color:'var(--text-secondary)', fontSize:'0.9rem' }}>
-              Te enviaremos un código de 6 dígitos a tu correo
-            </p>
-          </div>
-
-          <div className="card" style={{ marginBottom:12 }}>
-            <form onSubmit={handleSendOtp} style={{ display:'flex', flexDirection:'column', gap:14 }}>
-              <div className="input-group">
-                <label className="input-label" htmlFor="email-otp-input">Tu email</label>
-                <div className="input-icon-wrapper">
-                  <span className="input-icon">✉</span>
-                  <input id="email-otp-input" className="input" type="email" placeholder="tucorreo@ejemplo.com"
-                    value={email} onChange={(e) => setEmail(e.target.value)} required autoFocus />
-                </div>
-              </div>
-              <button type="submit" className={`btn btn-primary btn-full ${loading?'btn-disabled':''}`} disabled={loading}>
-                {loading ? '⚡ Enviando...' : '📨 Enviar código'}
-              </button>
-            </form>
-          </div>
-          <button className="btn btn-ghost btn-full" onClick={() => setStep('password')}>
-            ← Volver al login
-          </button>
-        </div>
-      </div>
-    );
-  }
-
-  // ════════════════════════════════════════════════════════════
-  // PASO PRINCIPAL: Email + Contraseña
+  // FORMULARIO PRINCIPAL (Login / Registro)
   // ════════════════════════════════════════════════════════════
   return (
     <div className="page" style={{ justifyContent:'center', minHeight:'100dvh' }}>
@@ -279,60 +210,90 @@ export default function LoginPage() {
       <div className="container animate-slide-up" style={{ position:'relative', zIndex:1, padding:'32px 24px' }}>
         <Logo />
 
-        <div style={{ textAlign:'center', marginBottom:36 }}>
-          <h1 style={{ fontSize:'1.8rem', marginBottom:10, lineHeight:1.2 }}>
-            Gastos compartidos,{' '}
-            <span style={{ color:'var(--primary-light)' }}>sin drama</span>
-          </h1>
-          <p style={{ color:'var(--text-secondary)' }}>Registra gastos grupales y sabe exactamente quién debe cuánto.</p>
+        {/* Toggle Login / Registro */}
+        <div style={{ display:'flex', background:'var(--bg-card)', borderRadius:12,
+          padding:4, marginBottom:28, border:'1px solid var(--border)' }}>
+          {['login','register'].map(m => (
+            <button key={m} onClick={() => { setMode(m); setStep('form'); }}
+              style={{ flex:1, padding:'10px 0', borderRadius:10, fontWeight:600,
+                fontSize:'0.9rem', border:'none', cursor:'pointer', transition:'all 0.2s',
+                background: mode === m ? 'var(--primary)' : 'transparent',
+                color: mode === m ? '#fff' : 'var(--text-secondary)' }}>
+              {m === 'login' ? '🔑 Iniciar sesión' : '✨ Crear cuenta'}
+            </button>
+          ))}
         </div>
 
         <div className="card" style={{ marginBottom:16 }}>
-          <form onSubmit={handlePasswordLogin} style={{ display:'flex', flexDirection:'column', gap:14 }}>
+          <form onSubmit={mode === 'login' ? handleLogin : handleRegister}
+            style={{ display:'flex', flexDirection:'column', gap:14 }}>
+
+            {/* Email */}
             <div className="input-group">
               <label className="input-label" htmlFor="email-input">Email</label>
               <div className="input-icon-wrapper">
                 <span className="input-icon">✉</span>
-                <input id="email-input" className="input" type="email" placeholder="tucorreo@ejemplo.com"
-                  value={email} onChange={(e) => setEmail(e.target.value)} required autoFocus />
+                <input id="email-input" className="input" type="email"
+                  placeholder="tucorreo@ejemplo.com" value={email}
+                  onChange={e => setEmail(e.target.value)} required autoFocus />
               </div>
             </div>
 
+            {/* Contraseña */}
             <div className="input-group">
               <label className="input-label" htmlFor="password-input">Contraseña</label>
-              <div className="input-icon-wrapper">
+              <div className="input-icon-wrapper" style={{ position:'relative' }}>
                 <span className="input-icon">🔒</span>
-                <input id="password-input" className="input" type={showPass ? 'text' : 'password'}
-                  placeholder="Tu contraseña" value={password}
-                  onChange={(e) => setPassword_(e.target.value)} required />
-                <button type="button" onClick={() => setShowPass((v) => !v)}
+                <input id="password-input" className="input"
+                  type={showPass ? 'text' : 'password'}
+                  placeholder={mode === 'register' ? 'Mínimo 6 caracteres' : 'Tu contraseña'}
+                  value={password} onChange={e => setPassword_(e.target.value)} required />
+                <button type="button" onClick={() => setShowPass(v => !v)}
                   style={{ position:'absolute', right:12, top:'50%', transform:'translateY(-50%)',
-                    background:'none', border:'none', cursor:'pointer', color:'var(--text-secondary)', fontSize:'1rem' }}>
+                    background:'none', border:'none', cursor:'pointer',
+                    color:'var(--text-secondary)', fontSize:'1rem' }}>
                   {showPass ? '🙈' : '👁️'}
                 </button>
               </div>
             </div>
 
-            <button id="login-btn" type="submit"
-              className={`btn btn-primary btn-full ${loading ? 'btn-disabled':''}`} disabled={loading}>
-              {loading ? '⚡ Entrando...' : '✨ Entrar'}
+            {/* Confirmar contraseña (solo en registro) */}
+            {mode === 'register' && (
+              <div className="input-group">
+                <label className="input-label" htmlFor="pass-conf-input">Confirmar contraseña</label>
+                <div className="input-icon-wrapper">
+                  <span className="input-icon">🔒</span>
+                  <input id="pass-conf-input" className="input" type="password"
+                    placeholder="Repite la contraseña"
+                    value={passConf} onChange={e => setPassConf(e.target.value)} required />
+                </div>
+              </div>
+            )}
+
+            <button id="auth-submit-btn" type="submit"
+              className={`btn btn-primary btn-full ${loading ? 'btn-disabled':''}`}
+              disabled={loading}>
+              {loading
+                ? '⚡ Cargando...'
+                : mode === 'login' ? '✨ Entrar' : '🚀 Crear mi cuenta'}
             </button>
           </form>
         </div>
 
-        <div style={{ textAlign:'center' }}>
-          <button className="btn btn-ghost" style={{ fontSize:'0.85rem' }}
-            onClick={() => { setStep('otp_email'); }}>
-            🔢 No tengo contraseña — entrar con código
+        {/* Opción código OTP */}
+        <div style={{ textAlign:'center', marginTop:8 }}>
+          <button className="btn btn-ghost" style={{ fontSize:'0.85rem', color:'var(--text-secondary)' }}
+            onClick={() => { setMode('login'); setStep('otp_code'); handleSendOtp(); }}>
+            🔢 Entrar con código de un solo uso
           </button>
         </div>
 
-        <div style={{ display:'flex', flexDirection:'column', gap:10, marginTop:32 }}>
+        <div style={{ display:'flex', flexDirection:'column', gap:10, marginTop:28 }}>
           {[
-            { icon:'⚡', text:'Entra con contraseña — sin esperar emails' },
-            { icon:'👥', text:'Crea grupos y agrega miembros' },
+            { icon:'⚡', text:'Entra con contraseña — rápido y sin emails' },
+            { icon:'👥', text:'Invita a amigos y compartan gastos' },
             { icon:'💰', text:'Calcula quién debe cuánto automáticamente' },
-          ].map((f) => (
+          ].map(f => (
             <div key={f.text} style={{ display:'flex', alignItems:'center', gap:12,
               color:'var(--text-secondary)', fontSize:'0.85rem' }}>
               <span style={{ fontSize:'1.1rem' }}>{f.icon}</span>
