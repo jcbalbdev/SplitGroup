@@ -27,7 +27,12 @@ export const registerUser = async (email, password) => {
   const { data, error } = await supabase.auth.signUp({ email, password });
   if (error) throw new Error(error.message);
   if (!data.user) throw new Error('No se pudo crear la cuenta');
-  return { email: data.user.email, name: data.user.email.split('@')[0] };
+  return {
+    email: data.user.email,
+    name: data.user.email.split('@')[0],
+    // session es null si se requiere confirmar email, objeto si no
+    session: data.session,
+  };
 };
 
 export const verifyToken = async (email, token) => {

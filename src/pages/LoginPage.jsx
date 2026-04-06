@@ -48,8 +48,14 @@ export default function LoginPage() {
     if (password.length < 6)   { toast('Mínimo 6 caracteres', 'error'); return; }
     setLoading(true);
     try {
-      await registerUser(email.trim().toLowerCase(), password);
-      setStep('verify_email'); // Supabase envía confirmación al correo
+      const data = await registerUser(email.trim().toLowerCase(), password);
+      if (data.session) {
+        // Confirm email desactivado → sesión inmediata → entrar directo
+        login({ email: data.email, name: data.name });
+      } else {
+        // Confirm email activado → esperar verificación
+        setStep('verify_email');
+      }
     } catch (err) {
       toast(err.message || 'Error al crear cuenta', 'error');
     } finally {
