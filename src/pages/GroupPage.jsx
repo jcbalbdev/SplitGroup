@@ -159,7 +159,7 @@ export default function GroupPage() {
                   onEditExpense={(exp) => navigate(`/group/${groupId}/expense/${exp.expense_id}/edit`, { state: { usedCategoryKeys: expenseFilters.availableCategories } })}
                   onEditSession={(item) => navigate(`/group/${groupId}/session/${item.sessionId}/edit`, { state: { sessionExpenses: item.expenses, description: item.description, date: item.date, total: item.total } })}
                   pendingDebtByExpenseId={debtFilters.pendingDebtByExpenseId}
-                  settlements={debtFilters.settlements}
+                  settlements={settlements}
                   getExpenseCategoryEmoji={getExpenseCategoryEmoji}
                   dn={dn}
                 />
