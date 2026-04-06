@@ -164,13 +164,24 @@ function sendMagicLink(email) {
     });
   }
 
-  // Generar token
-  const token = Utilities.base64Encode(
-    lowerEmail + ':' + new Date().getTime() + ':' + Math.random()
-  ).replace(/[+/=]/g, '').substring(0, 48);
+  // Generar OTP de 6 digitos
+  const otp = String(Math.floor(100000 + Math.random() * 900000));
+
+  // Invalidar OTPs anteriores del mismo usuario
+  const sheet   = getSheet(SHEETS.AUTH_TOKENS);
+  const data    = sheet.getDataRange().getValues();
+  const hdr     = data[0];
+  const emailIdx = hdr.indexOf('user_email');
+  const usedIdx  = hdr.indexOf('used');
+  const typeIdx  = hdr.indexOf('type');
+  for (let i = 1; i < data.length; i++) {
+    if (data[i][emailIdx] === lowerEmail && data[i][typeIdx] === 'login' && !data[i][usedIdx]) {
+      sheet.getRange(i + 1, usedIdx + 1).setValue(true);
+    }
+  }
 
   appendRow(SHEETS.AUTH_TOKENS, {
-    token,
+    token: otp,
     user_email: lowerEmail,
     created_at: new Date().toISOString(),
     used: false,
@@ -178,32 +189,28 @@ function sendMagicLink(email) {
     group_id: '',
   });
 
-  const appUrl = 'https://split-group-gilt.vercel.app';
-  const magicLink = `${appUrl}?token=${token}`;
-
-  // Enviar email
+  // Enviar email con el codigo OTP
   MailApp.sendEmail({
     to: lowerEmail,
-    subject: '🔐 Tu acceso a SplitGroup',
+    subject: 'Tu codigo de acceso a SplitGroup',
     htmlBody: `
       <div style="font-family:sans-serif;max-width:480px;margin:0 auto;padding:24px;background:#0c0c14;color:#f0f0ff;border-radius:16px;">
         <div style="text-align:center;margin-bottom:24px;">
-          <span style="font-size:2.5rem;">💸</span>
+          <span style="font-size:2.5rem;">&#x1F4B8;</span>
           <h1 style="color:#7c5cfc;margin:8px 0 4px;font-size:1.5rem;">SplitGroup</h1>
           <p style="color:#9898b8;margin:0;font-size:0.9rem;">Gastos compartidos, sin drama</p>
         </div>
-        <div style="background:#1a1a2e;border-radius:12px;padding:20px;margin:16px 0;border:1px solid rgba(255,255,255,0.07);">
-          <p style="margin:0 0 16px;color:#9898b8;">Haz clic en el botón para entrar a tu cuenta:</p>
-          <a href="${magicLink}" style="display:block;background:linear-gradient(135deg,#7c5cfc,#5a3ed4);color:#fff;text-decoration:none;padding:14px 24px;border-radius:10px;text-align:center;font-weight:700;font-size:1rem;">
-            ✨ Entrar a SplitGroup
-          </a>
-          <p style="margin:12px 0 0;font-size:0.78rem;color:#5a5a7a;text-align:center;">
-            Este link expira en 1 hora. Si no solicitaste esto, ignora este email.
+        <div style="background:#1a1a2e;border-radius:12px;padding:24px;margin:16px 0;border:1px solid rgba(255,255,255,0.07);text-align:center;">
+          <p style="margin:0 0 16px;color:#9898b8;">Tu codigo de acceso es:</p>
+          <div style="font-size:2.8rem;font-weight:900;letter-spacing:0.25em;color:#7c5cfc;font-family:monospace;background:rgba(124,92,252,0.12);border-radius:12px;padding:20px 28px;display:inline-block;border:1px solid rgba(124,92,252,0.3);">
+            ${otp}
+          </div>
+          <p style="margin:16px 0 0;font-size:0.78rem;color:#5a5a7a;">
+            Expira en 10 minutos. No lo compartas con nadie.
           </p>
         </div>
         <p style="font-size:0.78rem;color:#5a5a7a;text-align:center;margin:16px 0 0;">
-          O copia este link: <br/>
-          <span style="color:#7c5cfc;word-break:break-all;">${magicLink}</span>
+          Si no solicitaste este codigo, ignora este email.
         </p>
       </div>
     `,
@@ -218,13 +225,14 @@ function verifyToken(token) {
   const tokens = getRows(SHEETS.AUTH_TOKENS);
   const tokenRow = tokens.find(t => t.token === token && !t.used);
 
-  if (!tokenRow) throw new Error('Token inválido o ya utilizado');
+  if (!tokenRow) throw new Error('Codigo invalido o ya utilizado');
 
-  // Verificar expiración (1 hora)
+  // Verificar expiracion (10 minutos para OTP)
   const created = new Date(tokenRow.created_at);
   const now = new Date();
-  const diff = (now - created) / 1000 / 60; // minutos
-  if (diff > 60) throw new Error('Token expirado');
+  const diff = (now - created) / 1000 / 60;
+  if (diff > 10) throw new Error('El codigo ha expirado. Solicita uno nuevo.');
+
 
   // Marcar como usado
   const sheet = getSheet(SHEETS.AUTH_TOKENS);
