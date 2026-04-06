@@ -41,6 +41,12 @@ export const sendMagicLink = (email) =>
 export const verifyToken = (token) =>
   callGAS('verifyToken', { token });
 
+export const loginWithPassword = (email, password) =>
+  callGAS('loginWithPassword', { email, password });
+
+export const setPassword = (email, newPassword) =>
+  callGAS('setPassword', { email, newPassword });
+
 // ── GRUPOS ────────────────────────────────────────────────────
 export const getGroups = (userEmail) =>
   callGASCached(`groups_${userEmail}`, 'getGroups', { userEmail });

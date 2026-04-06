@@ -60,8 +60,10 @@ function handleRequest(e) {
     let result;
     switch (action) {
       // Auth
-      case 'sendMagicLink':   result = sendMagicLink(params.email); break;
-      case 'verifyToken':     result = verifyToken(params.token); break;
+      case 'sendMagicLink':       result = sendMagicLink(params.email); break;
+      case 'verifyToken':         result = verifyToken(params.token); break;
+      case 'loginWithPassword':   result = loginWithPassword(params.email, params.password); break;
+      case 'setPassword':         result = setPassword(params.email, params.newPassword); break;
       // Grupos
       case 'getGroups':       result = getGroups(params.userEmail); break;
       case 'createGroup':     result = createGroup(params.name, params.createdBy); break;
@@ -111,7 +113,7 @@ function getSheet(name) {
 
 function initSheet(sheet, name) {
   const headers = {
-    [SHEETS.USERS]:                ['email', 'name', 'created_at'],
+    [SHEETS.USERS]:                ['email', 'name', 'created_at', 'password_hash', 'password_salt'],
     [SHEETS.AUTH_TOKENS]:          ['token', 'user_email', 'created_at', 'used', 'type', 'group_id'],
     [SHEETS.GROUPS]:               ['group_id', 'name', 'created_by', 'created_at'],
     [SHEETS.GROUP_MEMBERS]:        ['group_id', 'user_email', 'joined_at'],
@@ -778,4 +780,76 @@ function unmarkExpensePaid(expenseId) {
     if (String(rows[i][idIdx]) === String(expenseId)) sheet.deleteRow(i + 1);
   }
   return { success: true };
+}
+
+// ── CONTRASENA (login rapido sin email cada vez) ─────────────
+
+function hashPassword(password, salt) {
+  const bytes = Utilities.computeDigest(
+    Utilities.DigestAlgorithm.SHA_256,
+    password + salt,
+    Utilities.Charset.UTF_8
+  );
+  return bytes.map(b => (b < 0 ? b + 256 : b).toString(16).padStart(2, '0')).join('');
+}
+
+function ensurePasswordColumns() {
+  const sheet   = getSheet(SHEETS.USERS);
+  const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+  if (!headers.includes('password_hash')) {
+    sheet.getRange(1, sheet.getLastColumn() + 1).setValue('password_hash');
+  }
+  if (!headers.includes('password_salt')) {
+    sheet.getRange(1, sheet.getLastColumn() + 1).setValue('password_salt');
+  }
+}
+
+function loginWithPassword(email, password) {
+  if (!email || !password) throw new Error('Email y contrasena requeridos');
+  ensurePasswordColumns();
+
+  const sheet    = getSheet(SHEETS.USERS);
+  const data     = sheet.getDataRange().getValues();
+  const hdr      = data[0];
+  const emailIdx = hdr.indexOf('email');
+  const hashIdx  = hdr.indexOf('password_hash');
+  const saltIdx  = hdr.indexOf('password_salt');
+  const nameIdx  = hdr.indexOf('name');
+  const lowerEmail = email.toLowerCase().trim();
+
+  for (let i = 1; i < data.length; i++) {
+    if (data[i][emailIdx] !== lowerEmail) continue;
+    const storedHash = data[i][hashIdx];
+    const storedSalt = data[i][saltIdx];
+    if (!storedHash || !storedSalt) throw new Error('Sin contrasena configurada. Usa el codigo por email.');
+    if (hashPassword(password, storedSalt) !== storedHash) throw new Error('Contrasena incorrecta');
+    return { success: true, email: lowerEmail, name: data[i][nameIdx] };
+  }
+  throw new Error('Usuario no encontrado');
+}
+
+function setPassword(email, newPassword) {
+  if (!email || !newPassword) throw new Error('Parametros requeridos');
+  if (newPassword.length < 6) throw new Error('La contrasena debe tener al menos 6 caracteres');
+  ensurePasswordColumns();
+
+  const lowerEmail = email.toLowerCase().trim();
+  const salt = Utilities.getUuid().substring(0, 16);
+  const hash = hashPassword(newPassword, salt);
+
+  const sheet    = getSheet(SHEETS.USERS);
+  const data     = sheet.getDataRange().getValues();
+  const hdr      = data[0];
+  const emailIdx = hdr.indexOf('email');
+  const hashIdx  = hdr.indexOf('password_hash');
+  const saltIdx  = hdr.indexOf('password_salt');
+
+  for (let i = 1; i < data.length; i++) {
+    if (data[i][emailIdx] === lowerEmail) {
+      sheet.getRange(i + 1, hashIdx + 1).setValue(hash);
+      sheet.getRange(i + 1, saltIdx + 1).setValue(salt);
+      return { success: true };
+    }
+  }
+  throw new Error('Usuario no encontrado');
 }
