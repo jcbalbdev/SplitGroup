@@ -1,6 +1,6 @@
 // src/hooks/useExpenseFilters.js
 import { useState, useMemo } from 'react';
-import { detectCategory, getCategoryMeta } from '../utils/categories';
+import { detectCategory, getCategoryMeta, CATEGORIES } from '../utils/categories';
 import { DATE_PRESETS, getDateRange } from '../utils/datePresets';
 import { formatDate, formatMonth } from '../utils/balanceCalculator';
 
@@ -26,10 +26,19 @@ export function useExpenseFilters(allExpenses, categoryOverrides) {
   const [customFrom,     setCustomFrom]     = useState('');
   const [customTo,       setCustomTo]       = useState('');
 
-  // Helper: clave de categoría respetando overrides
+  // Helper: clave de categoría (fuente de verdad = backend, fallback = localStorage override, luego auto-detección)
   const getExpenseCategoryKey = (exp) => {
+    // 1. Override local (feedback inmediato tras editar en este dispositivo)
     const ov = categoryOverrides[exp.expense_id];
     if (ov) return ov.key === 'otros' ? `custom_${ov.label}` : ov.key;
+    // 2. Campo category del backend (sincronizado entre dispositivos)
+    const cat = (exp.category || '').trim();
+    if (cat && cat !== 'otros') {
+      const found = CATEGORIES.find((c) => c.key === cat);
+      if (found) return found.key;     // categoría predefinida (ej: 'comida')
+      return `custom_${cat}`;          // categoría personalizada (ej: 'Desayuno')
+    }
+    // 3. Auto-detección por descripción
     return detectCategory(exp.description);
   };
 

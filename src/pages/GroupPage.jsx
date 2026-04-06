@@ -60,14 +60,25 @@ export default function GroupPage() {
   // ── Helpers ───────────────────────────────────────────────────
   const dn = (email) => displayName(email, nicknames);
 
-  const getEmojiByExpenseId = (expenseId, description) => {
+  const getEmojiByExpenseId = (expenseId, description, categoryFromBackend = '') => {
     const ov = categoryOverrides[expenseId];
-    return ov ? ov.emoji : getCategoryEmojiFromDesc(description);
+    if (ov) return ov.emoji;
+    if (categoryFromBackend && categoryFromBackend !== 'otros') {
+      const found = getCategoryMeta(categoryFromBackend);
+      return found ? found.emoji : '💰';
+    }
+    return getCategoryEmojiFromDesc(description);
   };
 
   const getExpenseCategoryEmoji = (exp) => {
     const ov = categoryOverrides[exp.expense_id];
-    return ov ? ov.emoji : getCategoryEmojiFromDesc(exp.description);
+    if (ov) return ov.emoji;
+    const cat = (exp.category || '').trim();
+    if (cat && cat !== 'otros') {
+      const found = getCategoryMeta(cat);
+      return found ? found.emoji : '💰';
+    }
+    return getCategoryEmojiFromDesc(exp.description);
   };
 
   const buildCatItems = (keys) => keys.map((key) => {
