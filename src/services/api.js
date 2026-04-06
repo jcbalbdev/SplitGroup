@@ -114,3 +114,17 @@ export const settleDebt = async (groupId, fromUser, toUser, amount) => {
   cacheInvalidatePattern('groups_');
   return result;
 };
+
+// ── LIQUIDACIONES POR GASTO (sincronizadas entre miembros) ────
+export const getExpenseSettlements = (groupId) =>
+  callGAS('getExpenseSettlements', { groupId });
+
+export const markExpensePaid = async (expenseId, groupId, settledBy) => {
+  const result = await callGAS('markExpensePaid', { expenseId, groupId, settledBy });
+  return result;
+};
+
+export const unmarkExpensePaid = async (expenseId, groupId) => {
+  const result = await callGAS('unmarkExpensePaid', { expenseId, groupId });
+  return result;
+};

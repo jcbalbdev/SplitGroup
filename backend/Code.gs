@@ -32,13 +32,14 @@ function testSetup() {
 
 // Nombres de las hojas
 const SHEETS = {
-  USERS:               'Users',
-  AUTH_TOKENS:         'AuthTokens',
-  GROUPS:              'Groups',
-  GROUP_MEMBERS:       'GroupMembers',
-  EXPENSES:            'Expenses',
+  USERS:                'Users',
+  AUTH_TOKENS:          'AuthTokens',
+  GROUPS:               'Groups',
+  GROUP_MEMBERS:        'GroupMembers',
+  EXPENSES:             'Expenses',
   EXPENSE_PARTICIPANTS: 'ExpenseParticipants',
-  SETTLEMENTS:         'Settlements',
+  SETTLEMENTS:          'Settlements',
+  EXPENSE_SETTLEMENTS:  'ExpenseSettlements',
 };
 
 // ── ENTRY POINT ────────────────────────────────────────────────
@@ -74,8 +75,12 @@ function handleRequest(e) {
       case 'updateExpenseSession':  result = updateExpenseSession(JSON.parse(params.data)); break;
       case 'deleteExpenseSession':  result = deleteExpenseSession(params.sessionId); break;
       // Balances
-      case 'getBalances':     result = getBalances(params.groupId); break;
-      case 'settleDebt':      result = settleDebt(params.groupId, params.fromUser, params.toUser, parseFloat(params.amount)); break;
+      case 'getBalances':           result = getBalances(params.groupId); break;
+      case 'settleDebt':            result = settleDebt(params.groupId, params.fromUser, params.toUser, parseFloat(params.amount)); break;
+      // Liquidaciones por gasto (sincronizadas entre miembros)
+      case 'getExpenseSettlements': result = getExpenseSettlements(params.groupId); break;
+      case 'markExpensePaid':       result = markExpensePaid(params.expenseId, params.groupId, params.settledBy); break;
+      case 'unmarkExpensePaid':     result = unmarkExpensePaid(params.expenseId); break;
       default:
         result = { error: `Acción desconocida: ${action}` };
     }
@@ -106,13 +111,14 @@ function getSheet(name) {
 
 function initSheet(sheet, name) {
   const headers = {
-    [SHEETS.USERS]:               ['email', 'name', 'created_at'],
-    [SHEETS.AUTH_TOKENS]:         ['token', 'user_email', 'created_at', 'used', 'type', 'group_id'],
-    [SHEETS.GROUPS]:              ['group_id', 'name', 'created_by', 'created_at'],
-    [SHEETS.GROUP_MEMBERS]:       ['group_id', 'user_email', 'joined_at'],
-    [SHEETS.EXPENSES]:            ['expense_id', 'group_id', 'amount', 'paid_by', 'date', 'description', 'session_id', 'category', 'created_at'],
+    [SHEETS.USERS]:                ['email', 'name', 'created_at'],
+    [SHEETS.AUTH_TOKENS]:          ['token', 'user_email', 'created_at', 'used', 'type', 'group_id'],
+    [SHEETS.GROUPS]:               ['group_id', 'name', 'created_by', 'created_at'],
+    [SHEETS.GROUP_MEMBERS]:        ['group_id', 'user_email', 'joined_at'],
+    [SHEETS.EXPENSES]:             ['expense_id', 'group_id', 'amount', 'paid_by', 'date', 'description', 'session_id', 'category', 'created_at'],
     [SHEETS.EXPENSE_PARTICIPANTS]: ['expense_id', 'user_email', 'share_amount'],
-    [SHEETS.SETTLEMENTS]:         ['settlement_id', 'group_id', 'from_user', 'to_user', 'amount', 'settled_at'],
+    [SHEETS.SETTLEMENTS]:          ['settlement_id', 'group_id', 'from_user', 'to_user', 'amount', 'settled_at'],
+    [SHEETS.EXPENSE_SETTLEMENTS]:  ['expense_id', 'group_id', 'settled_by', 'settled_at'],
   };
   if (headers[name]) {
     sheet.getRange(1, 1, 1, headers[name].length).setValues([headers[name]]);
@@ -172,8 +178,7 @@ function sendMagicLink(email) {
     group_id: '',
   });
 
-  // IMPORTANTE: Cambia esto por la URL de tu frontend deployado
-  const appUrl = 'http://localhost:5173'; // Cambiar a tu dominio de producción al hacer deploy
+  const appUrl = 'https://split-group-gilt.vercel.app';
   const magicLink = `${appUrl}?token=${token}`;
 
   // Enviar email
@@ -387,7 +392,7 @@ function inviteMember(groupId, email) {
   const group  = groups.find(g => g.group_id === groupId);
   const groupName = group ? group.name : 'un grupo';
 
-  const appUrl = 'http://localhost:5173'; // Cambiar a tu dominio de producción al hacer deploy
+  const appUrl = 'https://split-group-gilt.vercel.app';
   const inviteLink = `${appUrl}?token=${token}`;
 
   MailApp.sendEmail({
@@ -728,5 +733,41 @@ function deleteExpenseSession(sessionId) {
     }
   }
 
+  return { success: true };
+}
+
+// ── LIQUIDACIONES POR GASTO (sincronizadas) ───────────────────
+
+function getExpenseSettlements(groupId) {
+  if (!groupId) throw new Error('groupId requerido');
+  const rows = getRows(SHEETS.EXPENSE_SETTLEMENTS);
+  const settled = {};
+  rows.filter(r => String(r.group_id) === String(groupId))
+      .forEach(r => { settled[r.expense_id] = { settled: true, settledAt: r.settled_at, settledBy: r.settled_by }; });
+  return { settlements: settled };
+}
+
+function markExpensePaid(expenseId, groupId, settledBy) {
+  if (!expenseId || !groupId) throw new Error('expenseId y groupId requeridos');
+  // Idempotente: si ya existe, no duplicar
+  const rows = getRows(SHEETS.EXPENSE_SETTLEMENTS);
+  if (rows.find(r => String(r.expense_id) === String(expenseId))) return { success: true };
+  appendRow(SHEETS.EXPENSE_SETTLEMENTS, {
+    expense_id: expenseId,
+    group_id:   groupId,
+    settled_by: settledBy || '',
+    settled_at: new Date().toISOString(),
+  });
+  return { success: true };
+}
+
+function unmarkExpensePaid(expenseId) {
+  if (!expenseId) throw new Error('expenseId requerido');
+  const sheet = getSheet(SHEETS.EXPENSE_SETTLEMENTS);
+  const rows  = sheet.getDataRange().getValues();
+  const idIdx = rows[0].indexOf('expense_id');
+  for (let i = rows.length - 1; i >= 1; i--) {
+    if (String(rows[i][idIdx]) === String(expenseId)) sheet.deleteRow(i + 1);
+  }
   return { success: true };
 }

@@ -1,36 +1,37 @@
 // src/hooks/useGroupData.js
 import { useState, useEffect } from 'react';
-import { getGroupDetails, getExpenses, getGroups } from '../services/api';
-import { getCategoryOverrides } from '../utils/categoryOverrides';
+import { getGroupDetails, getExpenses, getGroups, getExpenseSettlements } from '../services/api';
 import { useToast } from '../components/ui/Toast';
 
 export function useGroupData(groupId, userEmail) {
   const toast = useToast();
 
-  const [group,            setGroup]            = useState(null);
-  const [members,          setMembers]          = useState([]);
-  const [allExpenses,      setAllExpenses]      = useState([]);
-  const [memberGroupsMap,  setMemberGroupsMap]  = useState({});
-  const [loading,          setLoading]          = useState(true);
-  const [categoryOverrides, setCategoryOverrides] = useState(getCategoryOverrides);
+  const [group,           setGroup]          = useState(null);
+  const [members,         setMembers]         = useState([]);
+  const [allExpenses,     setAllExpenses]     = useState([]);
+  const [memberGroupsMap, setMemberGroupsMap] = useState({});
+  const [loading,         setLoading]         = useState(true);
+  const [settlements,     setSettlements]     = useState({});
 
-  // Refresca overrides cuando la pestaña vuelve a ser visible
-  useEffect(() => {
-    const onFocus = () => setCategoryOverrides(getCategoryOverrides());
-    window.addEventListener('focus', onFocus);
-    return () => window.removeEventListener('focus', onFocus);
-  }, []);
+  const reloadSettlements = async () => {
+    try {
+      const res = await getExpenseSettlements(groupId);
+      setSettlements(res.settlements || {});
+    } catch { /* silencioso */ }
+  };
 
   const reload = async () => {
     setLoading(true);
     try {
-      const [detailRes, expenseRes] = await Promise.all([
+      const [detailRes, expenseRes, settlRes] = await Promise.all([
         getGroupDetails(groupId),
         getExpenses(groupId),
+        getExpenseSettlements(groupId),
       ]);
       setGroup(detailRes.group);
       setMembers(detailRes.members || []);
       setAllExpenses(expenseRes.expenses || []);
+      setSettlements(settlRes.settlements || {});
 
       // Otros grupos de cada miembro (para los badges en Miembros)
       try {
@@ -57,11 +58,14 @@ export function useGroupData(groupId, userEmail) {
       toast('Error cargando el grupo', 'error');
     } finally {
       setLoading(false);
-      setCategoryOverrides(getCategoryOverrides());
     }
   };
 
   useEffect(() => { reload(); }, [groupId]);
 
-  return { group, members, allExpenses, memberGroupsMap, loading, categoryOverrides, setCategoryOverrides, reload };
+  return {
+    group, members, allExpenses, memberGroupsMap,
+    loading, settlements, reloadSettlements,
+    reload,
+  };
 }

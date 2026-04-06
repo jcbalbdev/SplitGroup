@@ -9,9 +9,8 @@ import { PageHeader } from '../components/ui/PageHeader';
 import { ExpenseDetailModal } from '../components/ui/ExpenseDetailModal';
 import { AvatarPickerModal } from '../components/ui/AvatarPickerModal';
 import { getNicknames, setNickname, displayName } from '../utils/nicknames';
-import { getCategoryEmojiFromDesc } from '../utils/categories';
+import { getCategoryEmojiFromDesc, getCategoryMeta } from '../utils/categories';
 import { getCategoryOverrides } from '../utils/categoryOverrides';
-import { getCategoryMeta } from '../utils/categories';
 
 // Hooks de dominio
 import { useGroupData } from '../hooks/useGroupData';
@@ -46,14 +45,17 @@ export default function GroupPage() {
   // ── Data ──────────────────────────────────────────────────────
   const {
     group, members, allExpenses, memberGroupsMap,
-    loading, categoryOverrides,
+    loading, settlements, reloadSettlements,
   } = useGroupData(groupId, user?.email);
+
+  // categoryOverrides (locales, para emojis personalizados)
+  const [categoryOverrides] = useState(getCategoryOverrides);
 
   // ── Filtros Gastos ────────────────────────────────────────────
   const expenseFilters = useExpenseFilters(allExpenses, categoryOverrides);
 
   // ── Filtros + Acciones Deudas ─────────────────────────────────
-  const debtFilters = useDebtFilters(allExpenses, categoryOverrides, user?.email);
+  const debtFilters = useDebtFilters(allExpenses, settlements, groupId, user?.email);
 
   // ── Helpers ───────────────────────────────────────────────────
   const dn = (email) => displayName(email, nicknames);
@@ -133,8 +135,8 @@ export default function GroupPage() {
                   setDebtCustomFrom={debtFilters.setDebtCustomFrom}
                   debtCustomTo={debtFilters.debtCustomTo}
                   setDebtCustomTo={debtFilters.setDebtCustomTo}
-                  onSettle={(id) => debtFilters.handleSettle(id, toast)}
-                  onUnsettle={(id) => debtFilters.handleUnsettle(id, toast)}
+                  onSettle={(id) => debtFilters.handleSettle(id, toast, reloadSettlements)}
+                  onUnsettle={(id) => debtFilters.handleUnsettle(id, toast, reloadSettlements)}
                   getEmojiByExpenseId={getEmojiByExpenseId}
                   dn={dn}
                 />
