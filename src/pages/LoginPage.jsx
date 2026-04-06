@@ -73,8 +73,9 @@ export default function LoginPage() {
     if (full.length < 6) return;
     setLoading(true);
     try {
-      const data = await verifyToken(full);
+      const data = await verifyToken(email.trim().toLowerCase(), full);
       setVerifiedEmail(data.email);
+
       // Preguntamos si quiere crear contraseña
       login({ email: data.email, name: data.name });
       setStep('set_password');
