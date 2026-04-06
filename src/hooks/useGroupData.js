@@ -17,21 +17,25 @@ export function useGroupData(groupId, userEmail) {
     try {
       const res = await getExpenseSettlements(groupId);
       setSettlements(res.settlements || {});
-    } catch { /* silencioso */ }
+    } catch { /* silencioso — GAS puede no tener la función aún */ }
   };
 
   const reload = async () => {
     setLoading(true);
     try {
-      const [detailRes, expenseRes, settlRes] = await Promise.all([
+      // Carga principal — settlements es independiente y no bloquea si falla
+      const [detailRes, expenseRes] = await Promise.all([
         getGroupDetails(groupId),
         getExpenses(groupId),
-        getExpenseSettlements(groupId),
       ]);
       setGroup(detailRes.group);
       setMembers(detailRes.members || []);
       setAllExpenses(expenseRes.expenses || []);
-      setSettlements(settlRes.settlements || {});
+
+      // Settlements: no bloquea si el GAS aún no tiene la función
+      getExpenseSettlements(groupId)
+        .then((res) => setSettlements(res.settlements || {}))
+        .catch(() => { /* silencioso */ });
 
       // Otros grupos de cada miembro (para los badges en Miembros)
       try {
