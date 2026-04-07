@@ -120,48 +120,18 @@ export const getGroupDetails = async (groupId) => {
   };
 };
 
-// Helper: timeout para auth.signUp
-const signUpWithTimeout = (email, password, ms = 8000) =>
-  Promise.race([
-    supabase.auth.signUp({ email, password }),
-    new Promise((_, reject) =>
-      setTimeout(() => reject(new Error('TIMEOUT')), ms)
-    ),
-  ]);
-
 export const inviteAndCreateMember = async (groupId, email, password) => {
   const lowerEmail = email.toLowerCase().trim();
 
-  // 1. Asegurar que el perfil exista en la tabla (sin depender de auth)
-  await supabase.from('profiles').upsert(
-    [{ email: lowerEmail, name: lowerEmail.split('@')[0] }],
-    { onConflict: 'email', ignoreDuplicates: true }
-  );
+  // Llama a la función SQL que crea el usuario directamente en auth.users
+  // Es instantánea: no envía emails ni hace peticiones lentas.
+  const { data, error } = await supabase.rpc('create_member_and_add_to_group', {
+    p_email:    lowerEmail,
+    p_password: password,
+    p_group_id: groupId,
+  });
 
-  // 2. Añadir al grupo (esto es instantáneo)
-  const { error: memberError } = await supabase
-    .from('group_members')
-    .insert([{ group_id: groupId, user_email: lowerEmail }]);
-
-  if (memberError && memberError.code !== '23505') {
-    throw new Error('Error al añadir al grupo: ' + memberError.message);
-  }
-
-  // 3. Intentar crear cuenta en Supabase Auth (con timeout)
-  //    Si falla o tarda demasiado, el miembro sigue añadido al grupo.
-  try {
-    const { error: signUpError } = await signUpWithTimeout(lowerEmail, password);
-    const alreadyExists =
-      signUpError?.message?.toLowerCase().includes('already registered') ||
-      signUpError?.message?.toLowerCase().includes('already been registered');
-    if (signUpError && !alreadyExists && signUpError.message !== 'TIMEOUT') {
-      console.warn('signUp error (no bloqueante):', signUpError.message);
-    }
-  } catch (err) {
-    // Timeout u otro error — seguimos, la cuenta la puede crear el usuario luego
-    console.warn('signUp timeout o error para', lowerEmail, err.message);
-  }
-
+  if (error) throw new Error('Error al crear miembro: ' + error.message);
   return { success: true };
 };
 
