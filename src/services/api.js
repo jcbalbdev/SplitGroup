@@ -38,7 +38,7 @@ export const registerUser = async (email, password) => {
 export const verifyToken = async (email, token) => {
   const { data, error } = await supabase.auth.verifyOtp({ email, token, type: 'email' });
   if (error) throw new Error('Código incorrecto o expirado');
-  
+
   // Asegurar que exista su perfil
   const { data: profile } = await supabase.from('profiles').select('*').eq('auth_id', data.user.id).single();
   return { email: data.user.email, name: profile?.name || data.user.email.split('@')[0] };
@@ -47,7 +47,7 @@ export const verifyToken = async (email, token) => {
 export const loginWithPassword = async (email, password) => {
   const { data, error } = await supabase.auth.signInWithPassword({ email, password });
   if (error) throw new Error(error.message);
-  
+
   const { data: profile } = await supabase.from('profiles').select('*').eq('auth_id', data.user.id).single();
   return { email: data.user.email, name: profile?.name || data.user.email.split('@')[0] };
 };
@@ -70,9 +70,9 @@ export const getGroups = async (userEmail) => {
       groups:group_id (name, created_by, created_at)
     `)
     .eq('user_email', userEmail);
-    
+
   if (error) return handleResponse(null, error, 'Error al obtener grupos');
-  
+
   // Formatear salida para compatibilidad
   const groups = data.map(item => ({
     group_id: item.group_id,
@@ -89,14 +89,14 @@ export const createGroup = async (name, createdBy) => {
     .insert([{ name, created_by: createdBy }])
     .select()
     .single();
-    
+
   if (error) return handleResponse(null, error, 'Error al crear grupo');
-  
+
   // Añadir creador como miembro
   await supabase
     .from('group_members')
     .insert([{ group_id: group.group_id, user_email: createdBy }]);
-    
+
   return { success: true, group_id: group.group_id };
 };
 
@@ -106,7 +106,7 @@ export const getGroupDetails = async (groupId) => {
     .select('*')
     .eq('group_id', groupId)
     .single();
-    
+
   if (gError) throw new Error('Grupo no encontrado');
 
   const { data: members, error: mError } = await supabase
@@ -120,27 +120,42 @@ export const getGroupDetails = async (groupId) => {
   };
 };
 
-export const inviteMember = async (groupId, email) => {
+export const inviteAndCreateMember = async (groupId, email, password) => {
   const lowerEmail = email.toLowerCase().trim();
 
-  // Crear perfil si no existe (upsert para evitar errores de duplicado)
+  // 1. Intentar crear la cuenta del invitado
+  const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
+    email: lowerEmail,
+    password,
+  });
+
+  // Ignorar "User already registered" — simplemente se añade al grupo
+  const alreadyExists = signUpError?.message?.toLowerCase().includes('already registered')
+    || signUpError?.message?.toLowerCase().includes('already been registered');
+  if (signUpError && !alreadyExists) {
+    throw new Error('Error al crear cuenta del miembro: ' + signUpError.message);
+  }
+
+  // 2. Asegurar que exista el perfil
   await supabase.from('profiles').upsert(
     [{ email: lowerEmail, name: lowerEmail.split('@')[0] }],
     { onConflict: 'email', ignoreDuplicates: true }
   );
 
-  // Añadir al grupo (ignorar si ya es miembro)
-  const { error } = await supabase
+  // 3. Añadir al grupo
+  const { error: memberError } = await supabase
     .from('group_members')
     .insert([{ group_id: groupId, user_email: lowerEmail }]);
 
-  if (error && error.code !== '23505') {
-    console.error('Error invitando miembro:', error);
-    throw new Error('Error al invitar miembro: ' + error.message);
+  if (memberError && memberError.code !== '23505') {
+    throw new Error('Error al añadir al grupo: ' + memberError.message);
   }
 
-  return { success: true };
+  return { success: true, alreadyExisted: alreadyExists };
 };
+
+// Alias para compatibilidad
+export const inviteMember = inviteAndCreateMember;
 
 export const deleteGroup = async (groupId) => {
   const { error } = await supabase.from('groups').delete().eq('group_id', groupId);

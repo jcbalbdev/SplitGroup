@@ -2,11 +2,10 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { getGroups, createGroup, inviteMember } from '../services/api';
+import { getGroups, createGroup, inviteAndCreateMember } from '../services/api';
 import { Modal } from '../components/ui/Modal';
 import { useToast } from '../components/ui/Toast';
 import { SkeletonList } from '../components/ui/Skeleton';
-import { formatAmount } from '../utils/balanceCalculator';
 import { displayName } from '../utils/nicknames';
 
 export default function DashboardPage() {
@@ -14,23 +13,23 @@ export default function DashboardPage() {
   const navigate = useNavigate();
   const toast = useToast();
 
-  const [groups, setGroups] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [groups,          setGroups]          = useState([]);
+  const [loading,         setLoading]         = useState(true);
   const [showCreateModal, setShowCreateModal] = useState(false);
-  const [groupName, setGroupName] = useState('');
-  const [memberEmails, setMemberEmails] = useState(['']);
+  const [groupName,       setGroupName]       = useState('');
+  // Cada miembro: { email, password }
+  const [members, setMembers] = useState([{ email: '', password: '' }]);
   const [creating, setCreating] = useState(false);
+  const [showPassIdx, setShowPassIdx] = useState(null); // índice del campo con pass visible
 
-  useEffect(() => {
-    loadGroups();
-  }, []);
+  useEffect(() => { loadGroups(); }, []);
 
   const loadGroups = async () => {
     setLoading(true);
     try {
       const result = await getGroups(user.email);
       setGroups(result.groups || []);
-    } catch (err) {
+    } catch {
       toast('Error cargando grupos', 'error');
     } finally {
       setLoading(false);
@@ -45,14 +44,22 @@ export default function DashboardPage() {
       const result = await createGroup(groupName.trim(), user.email);
       const groupId = result.group_id;
 
-      // Invitar miembros
-      const validEmails = memberEmails.filter((e) => e.trim() && e !== user.email);
-      await Promise.all(validEmails.map((email) => inviteMember(groupId, email.trim())));
+      // Crear cuentas y añadir al grupo
+      const validMembers = members.filter((m) => m.email.trim() && m.email !== user.email);
+      const results = await Promise.allSettled(
+        validMembers.map((m) => inviteAndCreateMember(groupId, m.email.trim(), m.password))
+      );
 
-      toast(`Grupo "${groupName}" creado 🎉`);
+      const failed = results.filter((r) => r.status === 'rejected');
+      if (failed.length > 0) {
+        toast(`Grupo creado, pero ${failed.length} miembro(s) no pudieron ser añadidos`, 'error');
+      } else {
+        toast(`Grupo "${groupName}" creado 🎉`);
+      }
+
       setShowCreateModal(false);
       setGroupName('');
-      setMemberEmails(['']);
+      setMembers([{ email: '', password: '' }]);
       await loadGroups();
     } catch (err) {
       toast(err.message || 'Error al crear el grupo', 'error');
@@ -61,11 +68,10 @@ export default function DashboardPage() {
     }
   };
 
-  const addEmailField = () => setMemberEmails((prev) => [...prev, '']);
-  const updateEmail = (i, val) =>
-    setMemberEmails((prev) => prev.map((e, idx) => (idx === i ? val : e)));
-  const removeEmail = (i) =>
-    setMemberEmails((prev) => prev.filter((_, idx) => idx !== i));
+  const addMember    = () => setMembers((p) => [...p, { email: '', password: '' }]);
+  const removeMember = (i) => setMembers((p) => p.filter((_, idx) => idx !== i));
+  const updateMember = (i, field, val) =>
+    setMembers((p) => p.map((m, idx) => (idx === i ? { ...m, [field]: val } : m)));
 
   return (
     <div className="page">
@@ -78,12 +84,7 @@ export default function DashboardPage() {
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             <span className="text-sm text-muted">{displayName(user?.email)}</span>
-            <button
-              id="logout-btn"
-              className="btn btn-ghost btn-sm"
-              onClick={logout}
-              title="Cerrar sesión"
-            >
+            <button id="logout-btn" className="btn btn-ghost btn-sm" onClick={logout} title="Cerrar sesión">
               🚪
             </button>
           </div>
@@ -119,9 +120,7 @@ export default function DashboardPage() {
             <div className="empty-state animate-fade-in">
               <div className="empty-state-icon">🏘️</div>
               <div className="empty-state-title">No tienes grupos aún</div>
-              <div className="empty-state-text">
-                Crea tu primer grupo para empezar a registrar gastos
-              </div>
+              <div className="empty-state-text">Crea tu primer grupo para empezar a registrar gastos</div>
               <button
                 id="create-first-group-btn"
                 className="btn btn-primary"
@@ -133,48 +132,42 @@ export default function DashboardPage() {
             </div>
           ) : (
             <div className="list animate-fade-in">
-              {groups.map((g) => {
-              return (
+              {groups.map((g) => (
+                <div
+                  key={g.group_id}
+                  id={`group-${g.group_id}`}
+                  className="list-item card-interactive"
+                  onClick={() => navigate(`/group/${g.group_id}`)}
+                  role="button"
+                  tabIndex={0}
+                  onKeyDown={(e) => e.key === 'Enter' && navigate(`/group/${g.group_id}`)}
+                >
                   <div
-                    key={g.group_id}
-                    id={`group-${g.group_id}`}
-                    className="list-item card-interactive"
-                    onClick={() => navigate(`/group/${g.group_id}`)}
-                    role="button"
-                    tabIndex={0}
-                    onKeyDown={(e) => e.key === 'Enter' && navigate(`/group/${g.group_id}`)}
+                    style={{
+                      width: 44, height: 44, borderRadius: 12,
+                      background: 'linear-gradient(135deg, var(--primary), var(--primary-dark))',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      fontSize: '1.2rem', flexShrink: 0,
+                    }}
                   >
-                    <div
-                      style={{
-                        width: 44, height: 44, borderRadius: 12,
-                        background: 'linear-gradient(135deg, var(--primary), var(--primary-dark))',
-                        display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        fontSize: '1.2rem', flexShrink: 0,
-                      }}
-                    >
-                      👥
-                    </div>
-                    <div className="list-item-content">
-                      <div className="list-item-title">{g.name}</div>
-                      <div className="list-item-subtitle">{g.memberCount || 0} miembros</div>
-                    </div>
-                    <span style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>›</span>
+                    👥
                   </div>
-                );
-              })}
+                  <div className="list-item-content">
+                    <div className="list-item-title">{g.name}</div>
+                    <div className="list-item-subtitle">{g.memberCount || 0} miembros</div>
+                  </div>
+                  <span style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>›</span>
+                </div>
+              ))}
             </div>
           )}
         </div>
       </div>
 
-
       {/* Modal crear grupo */}
-      <Modal
-        isOpen={showCreateModal}
-        onClose={() => setShowCreateModal(false)}
-        title="Nuevo grupo"
-      >
+      <Modal isOpen={showCreateModal} onClose={() => setShowCreateModal(false)} title="Nuevo grupo">
         <form onSubmit={handleCreateGroup} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          {/* Nombre del grupo */}
           <div className="input-group">
             <label className="input-label" htmlFor="group-name-input">Nombre del grupo</label>
             <input
@@ -189,59 +182,74 @@ export default function DashboardPage() {
             />
           </div>
 
+          {/* Miembros */}
           <div className="input-group">
-            <label className="input-label">Invitar miembros (opcional)</label>
-            {memberEmails.map((email, i) => (
-              <div
-                key={i}
-                style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 6 }}
-              >
-                <input
-                  id={`member-email-${i}`}
-                  className="input"
-                  type="email"
-                  placeholder="email@ejemplo.com"
-                  value={email}
-                  onChange={(e) => updateEmail(i, e.target.value)}
-                />
-                {memberEmails.length > 1 && (
-                  <button
-                    type="button"
-                    className="btn btn-ghost btn-icon"
-                    onClick={() => removeEmail(i)}
-                    aria-label="Quitar"
-                  >
-                    ✕
+            <label className="input-label">Agregar miembros (opcional)</label>
+            <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginBottom: 8, lineHeight: 1.4 }}>
+              Se creará una cuenta para cada miembro. Comparte el email y contraseña con ellos.
+            </p>
+
+            {members.map((m, i) => (
+              <div key={i} style={{ display: 'flex', flexDirection: 'column', gap: 6,
+                background: 'var(--bg-secondary)', borderRadius: 10, padding: '10px 12px',
+                marginBottom: 8, border: '1px solid var(--border)' }}>
+
+                {/* Fila email + botón quitar */}
+                <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                  <input
+                    id={`member-email-${i}`}
+                    className="input"
+                    type="email"
+                    placeholder="email@ejemplo.com"
+                    value={m.email}
+                    onChange={(e) => updateMember(i, 'email', e.target.value)}
+                    style={{ flex: 1 }}
+                  />
+                  {members.length > 1 && (
+                    <button type="button" className="btn btn-ghost btn-icon"
+                      onClick={() => removeMember(i)} aria-label="Quitar">
+                      ✕
+                    </button>
+                  )}
+                </div>
+
+                {/* Contraseña temporal */}
+                <div style={{ position: 'relative' }}>
+                  <input
+                    id={`member-pass-${i}`}
+                    className="input"
+                    type={showPassIdx === i ? 'text' : 'password'}
+                    placeholder="Contraseña temporal (mín. 6 caracteres)"
+                    value={m.password}
+                    onChange={(e) => updateMember(i, 'password', e.target.value)}
+                    minLength={6}
+                    style={{ paddingRight: 40 }}
+                  />
+                  <button type="button"
+                    onClick={() => setShowPassIdx(showPassIdx === i ? null : i)}
+                    style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)',
+                      background: 'none', border: 'none', cursor: 'pointer',
+                      color: 'var(--text-muted)', fontSize: '1rem' }}>
+                    {showPassIdx === i ? '🙈' : '👁️'}
                   </button>
-                )}
+                </div>
               </div>
             ))}
-            <button
-              type="button"
-              className="btn btn-secondary btn-sm"
-              onClick={addEmailField}
-              style={{ alignSelf: 'flex-start' }}
-            >
+
+            <button type="button" className="btn btn-secondary btn-sm"
+              onClick={addMember} style={{ alignSelf: 'flex-start' }}>
               + Agregar otro
             </button>
           </div>
 
+          {/* Botones */}
           <div style={{ display: 'flex', gap: 10 }}>
-            <button
-              type="button"
-              className="btn btn-secondary"
-              style={{ flex: 1 }}
-              onClick={() => setShowCreateModal(false)}
-            >
+            <button type="button" className="btn btn-secondary" style={{ flex: 1 }}
+              onClick={() => setShowCreateModal(false)}>
               Cancelar
             </button>
-            <button
-              id="confirm-create-group-btn"
-              type="submit"
-              className="btn btn-primary"
-              style={{ flex: 1 }}
-              disabled={creating}
-            >
+            <button id="confirm-create-group-btn" type="submit"
+              className="btn btn-primary" style={{ flex: 1 }} disabled={creating}>
               {creating ? 'Creando...' : 'Crear grupo'}
             </button>
           </div>
