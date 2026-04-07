@@ -2,7 +2,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { getGroups, createGroup, inviteAndCreateMember } from '../services/api';
+import { getGroups, createGroup, inviteAndCreateMember, deleteGroup } from '../services/api';
 import { Modal } from '../components/ui/Modal';
 import { useToast } from '../components/ui/Toast';
 import { SkeletonList } from '../components/ui/Skeleton';
@@ -20,7 +20,10 @@ export default function DashboardPage() {
   // Cada miembro: { email, password }
   const [members, setMembers] = useState([{ email: '', password: '' }]);
   const [creating, setCreating] = useState(false);
-  const [showPassIdx, setShowPassIdx] = useState(null); // índice del campo con pass visible
+  const [showPassIdx, setShowPassIdx] = useState(null);
+  // Delete group
+  const [confirmDelete, setConfirmDelete] = useState(null); // { group_id, name }
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => { loadGroups(); }, []);
 
@@ -72,6 +75,21 @@ export default function DashboardPage() {
   const removeMember = (i) => setMembers((p) => p.filter((_, idx) => idx !== i));
   const updateMember = (i, field, val) =>
     setMembers((p) => p.map((m, idx) => (idx === i ? { ...m, [field]: val } : m)));
+
+  const handleDeleteGroup = async () => {
+    if (!confirmDelete) return;
+    setDeleting(true);
+    try {
+      await deleteGroup(confirmDelete.group_id);
+      toast(`Grupo "${confirmDelete.name}" eliminado`);
+      setConfirmDelete(null);
+      await loadGroups();
+    } catch (err) {
+      toast(err.message || 'Error al eliminar el grupo', 'error');
+    } finally {
+      setDeleting(false);
+    }
+  };
 
   return (
     <div className="page">
@@ -137,26 +155,29 @@ export default function DashboardPage() {
                   key={g.group_id}
                   id={`group-${g.group_id}`}
                   className="list-item card-interactive"
-                  onClick={() => navigate(`/group/${g.group_id}`)}
-                  role="button"
-                  tabIndex={0}
-                  onKeyDown={(e) => e.key === 'Enter' && navigate(`/group/${g.group_id}`)}
+                  style={{ paddingRight: 8 }}
                 >
-                  <div
-                    style={{
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 12, flex: 1, cursor: 'pointer' }}
+                    onClick={() => navigate(`/group/${g.group_id}`)}
+                    onKeyDown={(e) => e.key === 'Enter' && navigate(`/group/${g.group_id}`)}
+                    role="button" tabIndex={0}>
+                    <div style={{
                       width: 44, height: 44, borderRadius: 12,
                       background: 'linear-gradient(135deg, var(--primary), var(--primary-dark))',
                       display: 'flex', alignItems: 'center', justifyContent: 'center',
                       fontSize: '1.2rem', flexShrink: 0,
-                    }}
-                  >
-                    👥
+                    }}>👥</div>
+                    <div className="list-item-content">
+                      <div className="list-item-title">{g.name}</div>
+                      <div className="list-item-subtitle">{g.memberCount || 0} miembros</div>
+                    </div>
                   </div>
-                  <div className="list-item-content">
-                    <div className="list-item-title">{g.name}</div>
-                    <div className="list-item-subtitle">{g.memberCount || 0} miembros</div>
-                  </div>
-                  <span style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>›</span>
+                  <button
+                    className="btn btn-ghost btn-icon"
+                    title="Eliminar grupo"
+                    onClick={(e) => { e.stopPropagation(); setConfirmDelete({ group_id: g.group_id, name: g.name }); }}
+                    style={{ color: 'var(--text-muted)', fontSize: '1rem', flexShrink: 0 }}
+                  >🗑️</button>
                 </div>
               ))}
             </div>
@@ -254,6 +275,32 @@ export default function DashboardPage() {
             </button>
           </div>
         </form>
+      </Modal>
+
+      {/* Modal confirmación eliminar grupo */}
+      <Modal isOpen={!!confirmDelete} onClose={() => setConfirmDelete(null)} title="Eliminar grupo" centered>
+        {confirmDelete && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+            <p style={{ color: 'var(--text-secondary)', textAlign: 'center', lineHeight: 1.5 }}>
+              ¿Seguro que quieres eliminar <strong style={{ color: 'var(--text-primary)' }}>"{confirmDelete.name}"</strong>?
+              <br />
+              <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
+                Se eliminarán todos los gastos y miembros del grupo. Esta acción no se puede deshacer.
+              </span>
+            </p>
+            <div style={{ display: 'flex', gap: 10 }}>
+              <button className="btn btn-secondary" style={{ flex: 1 }}
+                onClick={() => setConfirmDelete(null)} disabled={deleting}>
+                Cancelar
+              </button>
+              <button id="confirm-delete-group-btn" className="btn btn-primary"
+                style={{ flex: 1, background: 'var(--error, #e53e3e)', borderColor: 'var(--error, #e53e3e)' }}
+                onClick={handleDeleteGroup} disabled={deleting}>
+                {deleting ? 'Eliminando...' : '🗑️ Eliminar'}
+              </button>
+            </div>
+          </div>
+        )}
       </Modal>
     </div>
   );

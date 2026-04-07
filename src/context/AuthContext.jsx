@@ -4,6 +4,15 @@ import { supabase } from '../services/supabase';
 
 const AuthContext = createContext(null);
 
+// getSession con timeout para evitar carga infinita si el token está caducado
+const getSessionWithTimeout = (ms = 5000) =>
+  Promise.race([
+    supabase.auth.getSession(),
+    new Promise((resolve) =>
+      setTimeout(() => resolve({ data: { session: null }, error: null }), ms)
+    ),
+  ]);
+
 export function AuthProvider({ children }) {
   const [user,    setUser]    = useState(null);
   const [loading, setLoading] = useState(true);
@@ -13,17 +22,16 @@ export function AuthProvider({ children }) {
 
     async function loadSession() {
       try {
-        const { data, error } = await supabase.auth.getSession();
+        const { data, error } = await getSessionWithTimeout(5000);
         if (error) throw error;
 
         const session = data?.session;
         if (session?.user) {
-          // Buscar perfil para obtener el nombre
           const { data: profile } = await supabase
             .from('profiles')
             .select('name')
             .eq('auth_id', session.user.id)
-            .maybeSingle(); // maybeSingle en vez de single (no lanza error si no existe)
+            .maybeSingle();
 
           if (mounted) {
             setUser({
@@ -34,7 +42,8 @@ export function AuthProvider({ children }) {
         }
       } catch (err) {
         console.error('Error al cargar sesión:', err.message);
-        // No bloquear la app aunque falle — simplemente no hay sesión
+        // Si el token es inválido, lo limpiamos
+        try { await supabase.auth.signOut(); } catch (_) {}
       } finally {
         if (mounted) setLoading(false);
       }
@@ -42,7 +51,6 @@ export function AuthProvider({ children }) {
 
     loadSession();
 
-    // Escuchar cambios de sesión
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
         if (!mounted) return;
@@ -75,9 +83,7 @@ export function AuthProvider({ children }) {
     };
   }, []);
 
-  const login = useCallback((userData) => {
-    setUser(userData);
-  }, []);
+  const login = useCallback((userData) => setUser(userData), []);
 
   const logout = useCallback(async () => {
     await supabase.auth.signOut();

@@ -109,15 +109,30 @@ export const getGroupDetails = async (groupId) => {
 
   if (gError) throw new Error('Grupo no encontrado');
 
-  const { data: members, error: mError } = await supabase
+  const { data: members } = await supabase
     .from('group_members')
-    .select('user_email')
+    .select('user_email, nickname')
     .eq('group_id', groupId);
 
   return {
-    ...group,
-    members: members?.map(m => m.user_email) || []
+    group: {
+      group_id:   group.group_id,
+      name:       group.name,
+      created_by: group.created_by,
+      created_at: group.created_at,
+    },
+    members: members?.map(m => ({ user_email: m.user_email, nickname: m.nickname || '' })) || [],
   };
+};
+
+export const setGroupNickname = async (groupId, email, nickname) => {
+  const { error } = await supabase
+    .from('group_members')
+    .update({ nickname: nickname || null })
+    .eq('group_id', groupId)
+    .eq('user_email', email.toLowerCase().trim());
+  if (error) throw new Error('Error guardando apodo: ' + error.message);
+  return { success: true };
 };
 
 export const inviteAndCreateMember = async (groupId, email, password) => {

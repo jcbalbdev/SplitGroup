@@ -8,7 +8,7 @@ import { SkeletonList } from '../components/ui/Skeleton';
 import { PageHeader } from '../components/ui/PageHeader';
 import { ExpenseDetailModal } from '../components/ui/ExpenseDetailModal';
 import { AvatarPickerModal } from '../components/ui/AvatarPickerModal';
-import { getNicknames, setNickname, displayName } from '../utils/nicknames';
+import { setGroupNickname } from '../services/api';
 import { getCategoryEmojiFromDesc, getCategoryMeta } from '../utils/categories';
 import { getCategoryOverrides } from '../utils/categoryOverrides';
 
@@ -36,8 +36,8 @@ export default function GroupPage() {
   const toast        = useToast();
 
   const [activeTab,        setActiveTab]        = useState('balances');
-  const [nicknames,        setNicknamesState]   = useState(getNicknames);
   const [editingNick,      setEditingNick]       = useState(null);
+  const [savingNick,       setSavingNick]        = useState(false);
   const [showAvatarPicker, setShowAvatarPicker] = useState(false);
   const [avatarVersion,    setAvatarVersion]    = useState(0);
   const [selectedExpense,  setSelectedExpense]  = useState(null);
@@ -45,11 +45,18 @@ export default function GroupPage() {
   // ── Data ──────────────────────────────────────────────────────
   const {
     group, members, allExpenses, memberGroupsMap,
+    dbNicknames, setDbNicknames,
     loading, settlements, reloadSettlements,
   } = useGroupData(groupId, user?.email);
 
   // categoryOverrides (locales, para emojis personalizados)
   const [categoryOverrides] = useState(getCategoryOverrides);
+
+  // ── displayName usando nicknames de la BD ─────────────────────
+  const dn = (email) => {
+    if (!email) return '';
+    return dbNicknames[email] || email.split('@')[0];
+  };
 
   // ── Filtros Gastos ────────────────────────────────────────────
   const expenseFilters = useExpenseFilters(allExpenses, categoryOverrides);
@@ -58,8 +65,6 @@ export default function GroupPage() {
   const debtFilters = useDebtFilters(allExpenses, settlements, groupId, user?.email);
 
   // ── Helpers ───────────────────────────────────────────────────
-  const dn = (email) => displayName(email, nicknames);
-
   const getEmojiByExpenseId = (expenseId, description, categoryFromBackend = '') => {
     const ov = categoryOverrides[expenseId];
     if (ov) return ov.emoji;
@@ -88,12 +93,29 @@ export default function GroupPage() {
     return { key, emoji: meta.emoji, label: meta.label };
   });
 
-  const saveNick = () => {
+  // ── Guardar apodo en la BD ────────────────────────────────────
+  const saveNick = async () => {
     if (!editingNick) return;
-    setNickname(editingNick.email, editingNick.value);
-    setNicknamesState(getNicknames());
-    setEditingNick(null);
-    toast('Apodo guardado ✅');
+    setSavingNick(true);
+    try {
+      await setGroupNickname(groupId, editingNick.email, editingNick.value.trim());
+      // Actualizar mapa local sin recargar todo
+      setDbNicknames((prev) => {
+        const next = { ...prev };
+        if (editingNick.value.trim()) {
+          next[editingNick.email] = editingNick.value.trim();
+        } else {
+          delete next[editingNick.email];
+        }
+        return next;
+      });
+      setEditingNick(null);
+      toast('Apodo guardado ✅');
+    } catch (err) {
+      toast(err.message || 'Error al guardar apodo', 'error');
+    } finally {
+      setSavingNick(false);
+    }
   };
 
   // ── Render ────────────────────────────────────────────────────
@@ -180,7 +202,7 @@ export default function GroupPage() {
                 <MemberList
                   members={members}
                   memberGroupsMap={memberGroupsMap}
-                  nicknames={nicknames}
+                  nicknames={dbNicknames}
                   currentUserEmail={user?.email}
                   avatarVersion={avatarVersion}
                   onEditNickname={setEditingNick}
@@ -196,29 +218,37 @@ export default function GroupPage() {
       <ExpenseDetailModal isOpen={!!selectedExpense} onClose={() => setSelectedExpense(null)} item={selectedExpense} groupName={group?.name} />
       <AvatarPickerModal isOpen={showAvatarPicker} onClose={() => setShowAvatarPicker(false)} email={user?.email || ''} onSaved={() => setAvatarVersion((v) => v + 1)} />
 
+      {/* Modal editar apodo */}
       <Modal isOpen={!!editingNick} onClose={() => setEditingNick(null)} title="Editar apodo" centered>
         {editingNick && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
             <div className="text-xs text-muted" style={{ textAlign: 'center' }}>{editingNick.email}</div>
             <div className="input-group">
-              <label className="input-label" htmlFor="nickname-input">Apodo</label>
-              <input id="nickname-input" className="input" type="text" placeholder={editingNick.email.split('@')[0]} value={editingNick.value} maxLength={20}
+              <label className="input-label" htmlFor="nickname-input">Apodo (visible para todos)</label>
+              <input id="nickname-input" className="input" type="text"
+                placeholder={editingNick.email.split('@')[0]}
+                value={editingNick.value} maxLength={20}
                 onChange={(e) => setEditingNick((prev) => ({ ...prev, value: e.target.value }))}
-                onKeyDown={(e) => e.key === 'Enter' && saveNick()} autoFocus />
+                onKeyDown={(e) => e.key === 'Enter' && saveNick()}
+                autoFocus />
             </div>
             {editingNick.value.trim() && (
               <div className="text-xs text-muted" style={{ textAlign: 'center', marginTop: -8 }}>
-                Se mostrará como <strong style={{ color: 'var(--text-primary)' }}>{editingNick.value.trim()}</strong> en toda la app
+                Se mostrará como <strong style={{ color: 'var(--text-primary)' }}>{editingNick.value.trim()}</strong> para todos los miembros
               </div>
             )}
             <div style={{ display: 'flex', gap: 10 }}>
-              {nicknames[editingNick.email] && (
-                <button className="btn btn-secondary" style={{ flex: 1 }} onClick={() => { setNickname(editingNick.email, ''); setNicknamesState(getNicknames()); setEditingNick(null); toast('Apodo eliminado'); }}>
+              {dbNicknames[editingNick.email] && (
+                <button className="btn btn-secondary" style={{ flex: 1 }}
+                  onClick={() => { setEditingNick((p) => ({ ...p, value: '' })); }}
+                  disabled={savingNick}>
                   Quitar apodo
                 </button>
               )}
-              <button id="save-nickname-btn" className="btn btn-primary" style={{ flex: 2 }} onClick={saveNick} disabled={!editingNick.value.trim() && !nicknames[editingNick.email]}>
-                Guardar
+              <button id="save-nickname-btn" className="btn btn-primary" style={{ flex: 2 }}
+                onClick={saveNick}
+                disabled={savingNick || (!editingNick.value.trim() && !dbNicknames[editingNick.email])}>
+                {savingNick ? 'Guardando...' : 'Guardar'}
               </button>
             </div>
           </div>

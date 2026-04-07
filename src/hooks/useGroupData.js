@@ -10,6 +10,8 @@ export function useGroupData(groupId, userEmail) {
   const [members,         setMembers]         = useState([]);
   const [allExpenses,     setAllExpenses]     = useState([]);
   const [memberGroupsMap, setMemberGroupsMap] = useState({});
+  // Mapa email → apodo cargado de la BD
+  const [dbNicknames,     setDbNicknames]     = useState({});
   const [loading,         setLoading]         = useState(true);
   const [settlements,     setSettlements]     = useState({});
 
@@ -17,27 +19,35 @@ export function useGroupData(groupId, userEmail) {
     try {
       const res = await getExpenseSettlements(groupId);
       setSettlements(res.settlements || {});
-    } catch { /* silencioso — GAS puede no tener la función aún */ }
+    } catch { /* silencioso */ }
   };
 
   const reload = async () => {
     setLoading(true);
     try {
-      // Carga principal — settlements es independiente y no bloquea si falla
       const [detailRes, expenseRes] = await Promise.all([
         getGroupDetails(groupId),
         getExpenses(groupId),
       ]);
+
+      const membersData = detailRes.members || [];
       setGroup(detailRes.group);
-      setMembers(detailRes.members || []);
+      setMembers(membersData);
       setAllExpenses(expenseRes.expenses || []);
 
-      // Settlements: no bloquea si el GAS aún no tiene la función
+      // Construir mapa de apodos desde la BD
+      const nicksMap = {};
+      membersData.forEach((m) => {
+        if (m.nickname) nicksMap[m.user_email] = m.nickname;
+      });
+      setDbNicknames(nicksMap);
+
+      // Settlements: no bloquea
       getExpenseSettlements(groupId)
         .then((res) => setSettlements(res.settlements || {}))
         .catch(() => { /* silencioso */ });
 
-      // Otros grupos de cada miembro (para los badges en Miembros)
+      // Otros grupos de cada miembro (badges en Miembros)
       try {
         const groupsRes     = await getGroups(userEmail);
         const allUserGroups = groupsRes?.groups || [];
@@ -69,6 +79,7 @@ export function useGroupData(groupId, userEmail) {
 
   return {
     group, members, allExpenses, memberGroupsMap,
+    dbNicknames, setDbNicknames,
     loading, settlements, reloadSettlements,
     reload,
   };
