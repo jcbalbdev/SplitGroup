@@ -15,7 +15,8 @@ export default function DashboardPage() {
   const toast = useToast();
 
   const GROUPS_KEY = `groups_${user?.email}`;
-  const seedGroups = getCached(GROUPS_KEY)?.data || [];
+  const rawSeed    = getCached(GROUPS_KEY)?.data;
+  const seedGroups = Array.isArray(rawSeed) ? rawSeed : [];
 
   const [groups,          setGroups]          = useState(seedGroups);
   const [loading,         setLoading]         = useState(seedGroups.length === 0);
@@ -36,7 +37,7 @@ export default function DashboardPage() {
     if (showSpinner) setLoading(true);
     try {
       const result = await getGroups(user.email);
-      const fresh = result.groups || [];
+      const fresh = Array.isArray(result?.groups) ? result.groups : [];
       setGroups(fresh);
       setCached(GROUPS_KEY, fresh);
     } catch {

@@ -7,6 +7,8 @@ import { useToast } from '../components/ui/Toast';
 import { PageHeader } from '../components/ui/PageHeader';
 import { ExpenseForm } from '../components/expense/ExpenseForm';
 import { formatAmount } from '../utils/balanceCalculator';
+import { saveUsedCategory } from '../utils/categories';
+import { getLocalDateString } from '../utils/localDate';
 
 export default function AddExpensePage() {
   const { groupId } = useParams();
@@ -38,9 +40,8 @@ export default function AddExpensePage() {
     amount:       '',
     paidBy:       user.email,
     description:  '',
-    category:     'otros',
-    customCategory: '',
-    date:         new Date().toISOString().split('T')[0],
+    category:     '',
+    date:         getLocalDateString(),
     participants: emails.map((e) => ({ email: e, value: '', selected: true })),
     payers:       emails.map((e) => ({ email: e, amount: '' })),
   };
@@ -49,6 +50,8 @@ export default function AddExpensePage() {
     setSubmitting(true);
     try {
       const label = description || category || 'Gasto';
+      // Guardar categoría para sugerencias futuras
+      if (category) saveUsedCategory(groupId, category);
 
       if (isMultiplePayers) {
         const sessionId   = `ses_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`;

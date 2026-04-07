@@ -8,48 +8,29 @@ if (!supabaseUrl || !supabaseAnonKey) {
   console.warn('Faltan variables de entorno de Supabase.');
 }
 
-/**
- * Custom storage: si el access_token está expirado, lo desechamos antes
- * de que Supabase intente refrescarlo (la llamada de refresh en free tier
- * puede tardar 15-30 s). Así el login es siempre rápido.
- * El access_token dura 1 hora; cuando expira el usuario hace login fresco
- * que es instantáneo.
- */
-const smartStorage = {
-  getItem(key) {
-    try {
-      const raw = localStorage.getItem(key);
-      if (!raw) return null;
-
-      // Solo interceptamos el token de sesión de Supabase
-      if (key.includes('-auth-token')) {
-        const parsed = JSON.parse(raw);
-        const expiresAt = parsed?.expires_at; // Unix timestamp en segundos
+// Limpiar tokens expirados ANTES de crear el cliente
+// Evita que el SDK intente refreshear un token caducado (tarda 15-30s en free tier)
+try {
+  Object.keys(localStorage)
+    .filter((k) => k.startsWith('sb-') && k.endsWith('-auth-token'))
+    .forEach((k) => {
+      try {
+        const parsed = JSON.parse(localStorage.getItem(k));
+        const expiresAt = parsed?.expires_at;
         if (expiresAt && Math.floor(Date.now() / 1000) >= expiresAt) {
-          // Token expirado → borrar y tratar como sin sesión (login rápido)
-          localStorage.removeItem(key);
-          return null;
+          localStorage.removeItem(k);
         }
-      }
-
-      return raw;
-    } catch {
-      return localStorage.getItem(key);
-    }
-  },
-  setItem(key, value) {
-    try { localStorage.setItem(key, value); } catch (_) {}
-  },
-  removeItem(key) {
-    try { localStorage.removeItem(key); } catch (_) {}
-  },
-};
+      } catch (_) {}
+    });
+} catch (_) {}
 
 export const supabase = createClient(supabaseUrl || '', supabaseAnonKey || '', {
   auth: {
-    storage:          smartStorage,
-    persistSession:   true,
-    autoRefreshToken: true,
+    persistSession:     true,
+    autoRefreshToken:   true,
     detectSessionInUrl: false,
+    flowType:           'implicit',
+    // No-op lock: evita deadlocks de navigator.locks durante HMR en desarrollo
+    lock: async (_name, _acquireTimeout, fn) => await fn(),
   },
 });

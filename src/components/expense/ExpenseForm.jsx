@@ -1,27 +1,17 @@
 // src/components/expense/ExpenseForm.jsx
 // Formulario de gasto reutilizado por AddExpensePage y EditExpensePage.
-// Encapsula toda la UI y lógica de campos, split y validación.
-// Las páginas solo proveen los datos iniciales y el callback onSubmit.
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
+import { useParams } from 'react-router-dom';
 import { Avatar } from '../ui/Avatar';
 import { FormSkeleton } from '../ui/FormSkeleton';
-import { CATEGORIES, getCategoryMeta } from '../../utils/categories';
+import { getUsedCategories, getCategoryEmoji } from '../../utils/categories';
 import { getNicknames, displayName } from '../../utils/nicknames';
 import { formatAmount } from '../../utils/balanceCalculator';
+import { getLocalDateString } from '../../utils/localDate';
 
 const SPLIT_MODES = { AMOUNT: 'amount', PERCENT: 'percent' };
 
-/**
- * @param {boolean}   loading          - muestra skeleton mientras carga
- * @param {Array}     members          - lista de miembros [{ user_email|email }]
- * @param {Object}    initialValues    - valores iniciales del formulario
- * @param {string}    submitLabel      - texto del botón de submit
- * @param {Function}  onSubmit         - callback async({ amount, paidBy, description, category, customCategory, date, participants, payers, isMultiplePayers })
- * @param {boolean}   submitting       - deshabilita el botón de submit
- * @param {boolean}   [allowMultiPayer=false] - muestra toggle de múltiples pagadores
- * @param {Array}     [visibleCategories]     - categorías a mostrar; por defecto todas
- */
 export function ExpenseForm({
   loading,
   members,
@@ -30,31 +20,52 @@ export function ExpenseForm({
   onSubmit,
   submitting,
   allowMultiPayer = false,
-  visibleCategories,
 }) {
+  const { groupId } = useParams();
   const nicknames = useMemo(() => getNicknames(), []);
   const dn = (email) => displayName(email, nicknames);
-  const cats = visibleCategories ?? CATEGORIES;
+
+  // Categorías usadas previamente en este grupo (sugerencias)
+  const usedCategories = useMemo(() => getUsedCategories(groupId), [groupId]);
 
   // ── Estado del formulario ──────────────────────────────────
   const [amount,          setAmount]          = useState(initialValues.amount ?? '');
   const [paidBy,          setPaidBy]          = useState(initialValues.paidBy ?? '');
   const [description,     setDescription]     = useState(initialValues.description ?? '');
-  const [category,        setCategory]        = useState(initialValues.category ?? 'otros');
-  const [customCategory,  setCustomCategory]  = useState(initialValues.customCategory ?? '');
-  const [date,            setDate]            = useState(initialValues.date ?? new Date().toISOString().split('T')[0]);
+  const [category,        setCategory]        = useState(initialValues.category ?? '');
+  const [date,            setDate]            = useState(initialValues.date ?? getLocalDateString());
   const [participants,    setParticipants]    = useState(initialValues.participants ?? []);
   const [payers,          setPayers]          = useState(initialValues.payers ?? []);
   const [isMultiplePayers, setIsMultiplePayers] = useState(false);
   const [splitMode,       setSplitMode]       = useState(SPLIT_MODES.AMOUNT);
 
-  // ── Derivados ──────────────────────────────────────────────
-  const totalAmount         = parseFloat(amount) || 0;
+  // ── Sincronizar participantes cuando members carga ──
+  useEffect(() => {
+    if (members.length > 0 && participants.length === 0) {
+      const emails = members.map((m) => m.user_email || m.email);
+      setParticipants(emails.map((e) => ({ email: e, value: '', selected: true })));
+      setPayers(emails.map((e) => ({ email: e, amount: '' })));
+    }
+  }, [members]);
+
+  // Auto-dividir equitativamente cuando cambia el monto o los participantes seleccionados
+  const totalAmount          = parseFloat(amount) || 0;
   const selectedParticipants = participants.filter((p) => p.selected);
-  const totalAssigned       = selectedParticipants.reduce((s, p) => s + (parseFloat(p.value) || 0), 0);
-  const payersTotal         = payers.reduce((s, p) => s + (parseFloat(p.amount) || 0), 0);
-  const splitDiff           = splitMode === SPLIT_MODES.AMOUNT ? totalAmount - totalAssigned : 100 - totalAssigned;
-  const payersDiff          = totalAmount - payersTotal;
+
+  useEffect(() => {
+    if (totalAmount > 0 && selectedParticipants.length > 0) {
+      const share = (totalAmount / selectedParticipants.length).toFixed(2);
+      setParticipants((prev) =>
+        prev.map((p) => (p.selected ? { ...p, value: share } : { ...p, value: '' }))
+      );
+    }
+  }, [totalAmount, selectedParticipants.length]);
+
+  // ── Derivados ──────────────────────────────────────────────
+  const totalAssigned = selectedParticipants.reduce((s, p) => s + (parseFloat(p.value) || 0), 0);
+  const payersTotal   = payers.reduce((s, p) => s + (parseFloat(p.amount) || 0), 0);
+  const splitDiff     = splitMode === SPLIT_MODES.AMOUNT ? totalAmount - totalAssigned : 100 - totalAssigned;
+  const payersDiff    = totalAmount - payersTotal;
 
   // ── Helpers ────────────────────────────────────────────────
   const toggleParticipant = (email) =>
@@ -89,7 +100,7 @@ export function ExpenseForm({
   const handleSubmit = (e) => {
     e.preventDefault();
     if (!isValid()) return;
-    onSubmit({ amount: totalAmount, paidBy, description, category, customCategory, date, participants, payers, isMultiplePayers, splitMode });
+    onSubmit({ amount: totalAmount, paidBy, description, category, date, participants, payers, isMultiplePayers, splitMode });
   };
 
   if (loading) return <FormSkeleton />;
@@ -132,40 +143,48 @@ export function ExpenseForm({
 
         <div className="input-group">
           <label className="input-label">Categoría</label>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-            {cats.map((cat) => {
-              const active = category === cat.key;
-              return (
-                <button
-                  key={cat.key}
-                  type="button"
-                  onClick={() => setCategory(cat.key)}
-                  style={{
-                    display: 'inline-flex', alignItems: 'center', gap: 5,
-                    padding: '6px 12px', borderRadius: 'var(--radius-full)',
-                    background: active ? 'var(--primary)' : 'var(--bg-hover)',
-                    border: `1px solid ${active ? 'var(--primary)' : 'var(--border)'}`,
-                    color: active ? '#fff' : 'var(--text-secondary)',
-                    fontWeight: active ? 700 : 400, fontSize: '0.8rem',
-                    cursor: 'pointer', transition: 'all 0.18s', fontFamily: 'inherit',
-                  }}
-                >
-                  {cat.emoji} {cat.label}
-                </button>
-              );
-            })}
-          </div>
-          {category === 'otros' && (
-            <input
-              id="custom-category-input"
-              className="input" type="text"
-              placeholder="Escribe la categoría (ej: Gym, Mascota...)"
-              value={customCategory}
-              onChange={(e) => setCustomCategory(e.target.value)}
-              autoFocus
-              style={{ marginTop: 8 }}
-            />
+
+          {/* Sugerencias de categorías usadas previamente */}
+          {usedCategories.length > 0 && (
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 8 }}>
+              {usedCategories.map((cat) => {
+                const active = category.toLowerCase() === cat;
+                return (
+                  <button
+                    key={cat}
+                    type="button"
+                    onClick={() => setCategory(active ? '' : cat)}
+                    style={{
+                      display: 'inline-flex', alignItems: 'center', gap: 5,
+                      padding: '6px 12px', borderRadius: 'var(--radius-full)',
+                      background: active ? 'var(--primary)' : 'var(--bg-hover)',
+                      border: `1px solid ${active ? 'var(--primary)' : 'var(--border)'}`,
+                      color: active ? '#fff' : 'var(--text-secondary)',
+                      fontWeight: active ? 700 : 400, fontSize: '0.8rem',
+                      cursor: 'pointer', transition: 'all 0.18s', fontFamily: 'inherit',
+                      textTransform: 'capitalize',
+                    }}
+                  >
+                    {getCategoryEmoji(cat)} {cat}
+                  </button>
+                );
+              })}
+            </div>
           )}
+
+          <input
+            id="category-input"
+            className="input" type="text"
+            placeholder="Escribe la categoría (ej: Gym, Mascota, Comida...)"
+            value={category}
+            onChange={(e) => setCategory(e.target.value)}
+            list="category-suggestions"
+          />
+          <datalist id="category-suggestions">
+            {usedCategories.map((cat) => (
+              <option key={cat} value={cat} />
+            ))}
+          </datalist>
         </div>
 
         <div className="input-group">
