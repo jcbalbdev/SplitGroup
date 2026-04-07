@@ -120,29 +120,25 @@ export const getGroupDetails = async (groupId) => {
   };
 };
 
+// Helper: timeout para auth.signUp
+const signUpWithTimeout = (email, password, ms = 8000) =>
+  Promise.race([
+    supabase.auth.signUp({ email, password }),
+    new Promise((_, reject) =>
+      setTimeout(() => reject(new Error('TIMEOUT')), ms)
+    ),
+  ]);
+
 export const inviteAndCreateMember = async (groupId, email, password) => {
   const lowerEmail = email.toLowerCase().trim();
 
-  // 1. Intentar crear la cuenta del invitado
-  const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
-    email: lowerEmail,
-    password,
-  });
-
-  // Ignorar "User already registered" — simplemente se añade al grupo
-  const alreadyExists = signUpError?.message?.toLowerCase().includes('already registered')
-    || signUpError?.message?.toLowerCase().includes('already been registered');
-  if (signUpError && !alreadyExists) {
-    throw new Error('Error al crear cuenta del miembro: ' + signUpError.message);
-  }
-
-  // 2. Asegurar que exista el perfil
+  // 1. Asegurar que el perfil exista en la tabla (sin depender de auth)
   await supabase.from('profiles').upsert(
     [{ email: lowerEmail, name: lowerEmail.split('@')[0] }],
     { onConflict: 'email', ignoreDuplicates: true }
   );
 
-  // 3. Añadir al grupo
+  // 2. Añadir al grupo (esto es instantáneo)
   const { error: memberError } = await supabase
     .from('group_members')
     .insert([{ group_id: groupId, user_email: lowerEmail }]);
@@ -151,11 +147,27 @@ export const inviteAndCreateMember = async (groupId, email, password) => {
     throw new Error('Error al añadir al grupo: ' + memberError.message);
   }
 
-  return { success: true, alreadyExisted: alreadyExists };
+  // 3. Intentar crear cuenta en Supabase Auth (con timeout)
+  //    Si falla o tarda demasiado, el miembro sigue añadido al grupo.
+  try {
+    const { error: signUpError } = await signUpWithTimeout(lowerEmail, password);
+    const alreadyExists =
+      signUpError?.message?.toLowerCase().includes('already registered') ||
+      signUpError?.message?.toLowerCase().includes('already been registered');
+    if (signUpError && !alreadyExists && signUpError.message !== 'TIMEOUT') {
+      console.warn('signUp error (no bloqueante):', signUpError.message);
+    }
+  } catch (err) {
+    // Timeout u otro error — seguimos, la cuenta la puede crear el usuario luego
+    console.warn('signUp timeout o error para', lowerEmail, err.message);
+  }
+
+  return { success: true };
 };
 
-// Alias para compatibilidad
+// Alias para compatibilidad con código antiguo
 export const inviteMember = inviteAndCreateMember;
+
 
 export const deleteGroup = async (groupId) => {
   const { error } = await supabase.from('groups').delete().eq('group_id', groupId);
