@@ -8,48 +8,63 @@ export function AuthProvider({ children }) {
   const [user,    setUser]    = useState(null);
   const [loading, setLoading] = useState(true);
 
-  // Al cargar la app: restaurar sesión de Supabase
   useEffect(() => {
     let mounted = true;
 
     async function loadSession() {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (session?.user) {
-        // Buscar perfil para obtener el nombre
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('name')
-          .eq('auth_id', session.user.id)
-          .single();
-          
-        if (mounted) {
-          setUser({ 
-            email: session.user.email, 
-            name: profile?.name || session.user.email.split('@')[0] 
-          });
+      try {
+        const { data, error } = await supabase.auth.getSession();
+        if (error) throw error;
+
+        const session = data?.session;
+        if (session?.user) {
+          // Buscar perfil para obtener el nombre
+          const { data: profile } = await supabase
+            .from('profiles')
+            .select('name')
+            .eq('auth_id', session.user.id)
+            .maybeSingle(); // maybeSingle en vez de single (no lanza error si no existe)
+
+          if (mounted) {
+            setUser({
+              email: session.user.email,
+              name: profile?.name || session.user.email.split('@')[0],
+            });
+          }
         }
+      } catch (err) {
+        console.error('Error al cargar sesión:', err.message);
+        // No bloquear la app aunque falle — simplemente no hay sesión
+      } finally {
+        if (mounted) setLoading(false);
       }
-      if (mounted) setLoading(false);
     }
 
     loadSession();
 
-    // Escuchar cambios de sesión (ej. si se desloguea desde otra pestaña)
+    // Escuchar cambios de sesión
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
+        if (!mounted) return;
         if (event === 'SIGNED_OUT') {
           setUser(null);
-        } else if (event === 'SIGNED_IN' && session) {
-           const { data: profile } = await supabase
-            .from('profiles')
-            .select('name')
-            .eq('auth_id', session.user.id)
-            .single();
-          
-          setUser({ 
-            email: session.user.email, 
-            name: profile?.name || session.user.email.split('@')[0] 
-          });
+        } else if ((event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') && session) {
+          try {
+            const { data: profile } = await supabase
+              .from('profiles')
+              .select('name')
+              .eq('auth_id', session.user.id)
+              .maybeSingle();
+
+            if (mounted) {
+              setUser({
+                email: session.user.email,
+                name: profile?.name || session.user.email.split('@')[0],
+              });
+            }
+          } catch (err) {
+            console.error('onAuthStateChange error:', err.message);
+          }
         }
       }
     );
@@ -60,16 +75,13 @@ export function AuthProvider({ children }) {
     };
   }, []);
 
-  /** Llamado tras un login manual para sincronizar el estado sin esperar a Supabase */
   const login = useCallback((userData) => {
     setUser(userData);
   }, []);
 
   const logout = useCallback(async () => {
-    setLoading(true);
     await supabase.auth.signOut();
     setUser(null);
-    setLoading(false);
   }, []);
 
   return (
