@@ -289,7 +289,7 @@ export default function LoginPage() {
         {/* Opción código OTP */}
         <div style={{ textAlign:'center', marginTop:8 }}>
           <button className="btn btn-ghost" style={{ fontSize:'0.85rem', color:'var(--text-secondary)' }}
-            onClick={() => { setMode('login'); setStep('otp_code'); handleSendOtp(); }}>
+            onClick={() => { setMode('login'); handleSendOtp(); }}>
             🔢 Entrar con código de un solo uso
           </button>
         </div>
