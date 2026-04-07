@@ -45,7 +45,7 @@ export const loginWithPassword = async (email, password) => {
   const { data, error } = await Promise.race([
     supabase.auth.signInWithPassword({ email, password }),
     new Promise((_, reject) =>
-      setTimeout(() => reject(new Error('La conexión tardó demasiado. Verifica tu internet e intenta de nuevo.')), 10000)
+      setTimeout(() => reject(new Error('El servidor tarda en responder. Espera unos segundos e intenta de nuevo.')), 30000)
     ),
   ]);
   if (error) throw new Error(error.message);

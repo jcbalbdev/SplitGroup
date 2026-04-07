@@ -4,16 +4,7 @@ import { supabase } from '../services/supabase';
 
 const AuthContext = createContext(null);
 
-// getSession con timeout para evitar carga infinita si el token está caducado
-const getSessionWithTimeout = (ms = 5000) =>
-  Promise.race([
-    supabase.auth.getSession(),
-    new Promise((resolve) =>
-      setTimeout(() => resolve({ data: { session: null }, error: null }), ms)
-    ),
-  ]);
-
-// Limpia tokens caducados de Supabase en localStorage
+// Limpia SOLO tokens verdaderamente inválidos (error "Refresh Token Not Found")
 const clearStaleTokens = () => {
   try {
     Object.keys(localStorage)
@@ -21,6 +12,16 @@ const clearStaleTokens = () => {
       .forEach((k) => localStorage.removeItem(k));
   } catch (_) {}
 };
+
+// getSession con timeout — si tarda, devuelve null sin borrar el token
+// El refresh en background seguirá y onAuthStateChange auto-actualizará
+const getSessionSafe = (ms = 8000) =>
+  Promise.race([
+    supabase.auth.getSession(),
+    new Promise((resolve) =>
+      setTimeout(() => resolve({ data: { session: null }, error: null, _timedOut: true }), ms)
+    ),
+  ]);
 
 export function AuthProvider({ children }) {
   const [user,    setUser]    = useState(null);
@@ -31,17 +32,28 @@ export function AuthProvider({ children }) {
 
     async function loadSession() {
       try {
-        const { data, error } = await getSessionWithTimeout(5000);
+        const result = await getSessionSafe(8000);
 
-        // "Invalid Refresh Token" → limpiar y continuar como no autenticado
+        // Timeout → no borrar token, solo continuar como no autenticado
+        // El onAuthStateChange disparará cuando el refresh complete en background
+        if (result._timedOut) {
+          console.warn('getSession tardó >8s, esperando onAuthStateChange...');
+          return;
+        }
+
+        const { data, error } = result;
+
         if (error) {
-          clearStaleTokens();
-          try { await supabase.auth.signOut(); } catch (_) {}
+          // "Invalid Refresh Token" → token realmente inválido → limpiar
+          if (error.message?.includes('Refresh Token')) {
+            clearStaleTokens();
+            try { await supabase.auth.signOut(); } catch (_) {}
+          }
           return;
         }
 
         const session = data?.session;
-        if (session?.user) {
+        if (session?.user && mounted) {
           const { data: profile } = await supabase
             .from('profiles')
             .select('name')
@@ -51,14 +63,12 @@ export function AuthProvider({ children }) {
           if (mounted) {
             setUser({
               email: session.user.email,
-              name: profile?.name || session.user.email.split('@')[0],
+              name:  profile?.name || session.user.email.split('@')[0],
             });
           }
         }
       } catch (err) {
-        console.error('Error al cargar sesión:', err.message);
-        clearStaleTokens();
-        try { await supabase.auth.signOut(); } catch (_) {}
+        console.error('loadSession error:', err.message);
       } finally {
         if (mounted) setLoading(false);
       }
@@ -66,11 +76,14 @@ export function AuthProvider({ children }) {
 
     loadSession();
 
+    // onAuthStateChange: maneja refresh tardío y nuevos logins
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
         if (!mounted) return;
+
         if (event === 'SIGNED_OUT') {
           setUser(null);
+          setLoading(false);
         } else if ((event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') && session) {
           try {
             const { data: profile } = await supabase
@@ -82,11 +95,13 @@ export function AuthProvider({ children }) {
             if (mounted) {
               setUser({
                 email: session.user.email,
-                name: profile?.name || session.user.email.split('@')[0],
+                name:  profile?.name || session.user.email.split('@')[0],
               });
+              setLoading(false); // quitar spinner si estaba tardando
             }
           } catch (err) {
             console.error('onAuthStateChange error:', err.message);
+            if (mounted) setLoading(false);
           }
         }
       }
@@ -98,8 +113,7 @@ export function AuthProvider({ children }) {
     };
   }, []);
 
-  const login = useCallback((userData) => setUser(userData), []);
-
+  const login  = useCallback((userData) => setUser(userData), []);
   const logout = useCallback(async () => {
     await supabase.auth.signOut();
     setUser(null);
