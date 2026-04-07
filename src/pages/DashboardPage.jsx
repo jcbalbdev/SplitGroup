@@ -43,7 +43,7 @@ export default function DashboardPage() {
     setCreating(true);
     try {
       const result = await createGroup(groupName.trim(), user.email);
-      const groupId = result.groupId;
+      const groupId = result.group_id;
 
       // Invitar miembros
       const validEmails = memberEmails.filter((e) => e.trim() && e !== user.email);

@@ -123,30 +123,20 @@ export const getGroupDetails = async (groupId) => {
 export const inviteMember = async (groupId, email) => {
   const lowerEmail = email.toLowerCase().trim();
 
-  // Asegurarnos de que el perfil exista (para poder añadirlo como FK)
-  const { data: profile } = await supabase.from('profiles').select('email').eq('email', lowerEmail).single();
-  if (!profile) {
-    await supabase.from('profiles').insert([{ email: lowerEmail, name: lowerEmail.split('@')[0] }]);
-  }
+  // Crear perfil si no existe (upsert para evitar errores de duplicado)
+  await supabase.from('profiles').upsert(
+    [{ email: lowerEmail, name: lowerEmail.split('@')[0] }],
+    { onConflict: 'email', ignoreDuplicates: true }
+  );
 
-  // Añadir al grupo
+  // Añadir al grupo (ignorar si ya es miembro)
   const { error } = await supabase
     .from('group_members')
     .insert([{ group_id: groupId, user_email: lowerEmail }]);
 
   if (error && error.code !== '23505') {
-    return handleResponse(null, error, 'Error al invitar miembro');
-  }
-
-  // Enviar OTP de invitación (el email llega con el código para que creen su cuenta)
-  try {
-    await supabase.auth.signInWithOtp({
-      email: lowerEmail,
-      options: { shouldCreateUser: true }
-    });
-  } catch (_) {
-    // Si falla el email, no bloqueamos (el miembro ya fue añadido al grupo)
-    console.warn('No se pudo enviar email de invitación a', lowerEmail);
+    console.error('Error invitando miembro:', error);
+    throw new Error('Error al invitar miembro: ' + error.message);
   }
 
   return { success: true };
