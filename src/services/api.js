@@ -38,18 +38,18 @@ export const registerUser = async (email, password) => {
 export const verifyToken = async (email, token) => {
   const { data, error } = await supabase.auth.verifyOtp({ email, token, type: 'email' });
   if (error) throw new Error('Código incorrecto o expirado');
-
-  // Asegurar que exista su perfil
-  const { data: profile } = await supabase.from('profiles').select('*').eq('auth_id', data.user.id).single();
-  return { email: data.user.email, name: profile?.name || data.user.email.split('@')[0] };
+  return { email: data.user.email, name: data.user.email.split('@')[0] };
 };
 
 export const loginWithPassword = async (email, password) => {
-  const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+  const { data, error } = await Promise.race([
+    supabase.auth.signInWithPassword({ email, password }),
+    new Promise((_, reject) =>
+      setTimeout(() => reject(new Error('La conexión tardó demasiado. Verifica tu internet e intenta de nuevo.')), 10000)
+    ),
+  ]);
   if (error) throw new Error(error.message);
-
-  const { data: profile } = await supabase.from('profiles').select('*').eq('auth_id', data.user.id).single();
-  return { email: data.user.email, name: profile?.name || data.user.email.split('@')[0] };
+  return { email: data.user.email, name: data.user.email.split('@')[0] };
 };
 
 export const setPassword = async (email, newPassword) => {
@@ -62,7 +62,6 @@ export const setPassword = async (email, newPassword) => {
 
 // ── GRUPOS ────────────────────────────────────────────────────
 export const getGroups = async (userEmail) => {
-  // Obtenemos los grupos donde el usuario es miembro
   const { data, error } = await supabase
     .from('group_members')
     .select(`
@@ -73,13 +72,28 @@ export const getGroups = async (userEmail) => {
 
   if (error) return handleResponse(null, error, 'Error al obtener grupos');
 
-  // Formatear salida para compatibilidad
-  const groups = data.map(item => ({
-    group_id: item.group_id,
-    name: item.groups.name,
-    created_by: item.groups.created_by,
-    created_at: item.groups.created_at
+  const groupIds = data.map((d) => d.group_id);
+
+  // Contar miembros reales por grupo
+  let countMap = {};
+  if (groupIds.length > 0) {
+    const { data: counts } = await supabase
+      .from('group_members')
+      .select('group_id')
+      .in('group_id', groupIds);
+    (counts || []).forEach((row) => {
+      countMap[row.group_id] = (countMap[row.group_id] || 0) + 1;
+    });
+  }
+
+  const groups = data.map((item) => ({
+    group_id:    item.group_id,
+    name:        item.groups?.name,
+    created_by:  item.groups?.created_by,
+    created_at:  item.groups?.created_at,
+    memberCount: countMap[item.group_id] || 0,
   }));
+
   return { groups };
 };
 
@@ -126,11 +140,11 @@ export const getGroupDetails = async (groupId) => {
 };
 
 export const setGroupNickname = async (groupId, email, nickname) => {
-  const { error } = await supabase
-    .from('group_members')
-    .update({ nickname: nickname || null })
-    .eq('group_id', groupId)
-    .eq('user_email', email.toLowerCase().trim());
+  const { error } = await supabase.rpc('update_group_member_nickname', {
+    p_group_id: groupId,
+    p_email:    email.toLowerCase().trim(),
+    p_nickname: nickname || '',
+  });
   if (error) throw new Error('Error guardando apodo: ' + error.message);
   return { success: true };
 };

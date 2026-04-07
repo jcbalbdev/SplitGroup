@@ -13,6 +13,15 @@ const getSessionWithTimeout = (ms = 5000) =>
     ),
   ]);
 
+// Limpia tokens caducados de Supabase en localStorage
+const clearStaleTokens = () => {
+  try {
+    Object.keys(localStorage)
+      .filter((k) => k.startsWith('sb-') && k.endsWith('-auth-token'))
+      .forEach((k) => localStorage.removeItem(k));
+  } catch (_) {}
+};
+
 export function AuthProvider({ children }) {
   const [user,    setUser]    = useState(null);
   const [loading, setLoading] = useState(true);
@@ -23,7 +32,13 @@ export function AuthProvider({ children }) {
     async function loadSession() {
       try {
         const { data, error } = await getSessionWithTimeout(5000);
-        if (error) throw error;
+
+        // "Invalid Refresh Token" → limpiar y continuar como no autenticado
+        if (error) {
+          clearStaleTokens();
+          try { await supabase.auth.signOut(); } catch (_) {}
+          return;
+        }
 
         const session = data?.session;
         if (session?.user) {
@@ -42,7 +57,7 @@ export function AuthProvider({ children }) {
         }
       } catch (err) {
         console.error('Error al cargar sesión:', err.message);
-        // Si el token es inválido, lo limpiamos
+        clearStaleTokens();
         try { await supabase.auth.signOut(); } catch (_) {}
       } finally {
         if (mounted) setLoading(false);

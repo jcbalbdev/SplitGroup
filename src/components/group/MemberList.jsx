@@ -39,8 +39,8 @@ export function MemberList({ members, memberGroupsMap, nicknames, currentUserEma
               {otherGroups.length > 0 && (
                 <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', paddingLeft: 52 }}>
                   <span className="text-xs text-muted" style={{ alignSelf: 'center' }}>También en:</span>
-                  {otherGroups.map((gName) => (
-                    <span key={gName} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '2px 9px', borderRadius: 'var(--radius-full)', background: 'rgba(124,92,252,0.12)', border: '1px solid rgba(124,92,252,0.25)', color: 'var(--primary)', fontSize: '0.72rem', fontWeight: 600 }}>
+                  {otherGroups.map((gName, gIdx) => (
+                    <span key={`${gName}-${gIdx}`} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '2px 9px', borderRadius: 'var(--radius-full)', background: 'rgba(124,92,252,0.12)', border: '1px solid rgba(124,92,252,0.25)', color: 'var(--primary)', fontSize: '0.72rem', fontWeight: 600 }}>
                       👥 {gName}
                     </span>
                   ))}

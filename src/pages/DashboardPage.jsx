@@ -7,33 +7,40 @@ import { Modal } from '../components/ui/Modal';
 import { useToast } from '../components/ui/Toast';
 import { SkeletonList } from '../components/ui/Skeleton';
 import { displayName } from '../utils/nicknames';
+import { getCached, setCached, clearCached } from '../utils/cache';
 
 export default function DashboardPage() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const toast = useToast();
 
-  const [groups,          setGroups]          = useState([]);
-  const [loading,         setLoading]         = useState(true);
+  const GROUPS_KEY = `groups_${user?.email}`;
+  const seedGroups = getCached(GROUPS_KEY)?.data || [];
+
+  const [groups,          setGroups]          = useState(seedGroups);
+  const [loading,         setLoading]         = useState(seedGroups.length === 0);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [groupName,       setGroupName]       = useState('');
-  // Cada miembro: { email, password }
   const [members, setMembers] = useState([{ email: '', password: '' }]);
   const [creating, setCreating] = useState(false);
   const [showPassIdx, setShowPassIdx] = useState(null);
   // Delete group
-  const [confirmDelete, setConfirmDelete] = useState(null); // { group_id, name }
+  const [confirmDelete, setConfirmDelete] = useState(null);
   const [deleting, setDeleting] = useState(false);
 
-  useEffect(() => { loadGroups(); }, []);
+  useEffect(() => {
+    loadGroups();
+  }, []);
 
-  const loadGroups = async () => {
-    setLoading(true);
+  const loadGroups = async (showSpinner = false) => {
+    if (showSpinner) setLoading(true);
     try {
       const result = await getGroups(user.email);
-      setGroups(result.groups || []);
+      const fresh = result.groups || [];
+      setGroups(fresh);
+      setCached(GROUPS_KEY, fresh);
     } catch {
-      toast('Error cargando grupos', 'error');
+      if (seedGroups.length === 0) toast('Error cargando grupos', 'error');
     } finally {
       setLoading(false);
     }
@@ -47,7 +54,6 @@ export default function DashboardPage() {
       const result = await createGroup(groupName.trim(), user.email);
       const groupId = result.group_id;
 
-      // Crear cuentas y añadir al grupo
       const validMembers = members.filter((m) => m.email.trim() && m.email !== user.email);
       const results = await Promise.allSettled(
         validMembers.map((m) => inviteAndCreateMember(groupId, m.email.trim(), m.password))
@@ -60,6 +66,7 @@ export default function DashboardPage() {
         toast(`Grupo "${groupName}" creado 🎉`);
       }
 
+      clearCached(GROUPS_KEY); // invalidar caché
       setShowCreateModal(false);
       setGroupName('');
       setMembers([{ email: '', password: '' }]);
@@ -82,6 +89,7 @@ export default function DashboardPage() {
     try {
       await deleteGroup(confirmDelete.group_id);
       toast(`Grupo "${confirmDelete.name}" eliminado`);
+      clearCached(GROUPS_KEY); // invalidar caché
       setConfirmDelete(null);
       await loadGroups();
     } catch (err) {

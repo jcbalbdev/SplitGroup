@@ -1,19 +1,32 @@
 // src/hooks/useGroupData.js
-import { useState, useEffect } from 'react';
+// Stale-while-revalidate: muestra caché al instante, refresca en background sin spinner
+import { useState, useEffect, useRef } from 'react';
 import { getGroupDetails, getExpenses, getGroups, getExpenseSettlements } from '../services/api';
 import { useToast } from '../components/ui/Toast';
+import { getCached, setCached } from '../utils/cache';
+
+function buildNicksMap(members) {
+  const map = {};
+  (members || []).forEach((m) => { if (m.nickname) map[m.user_email] = m.nickname; });
+  return map;
+}
 
 export function useGroupData(groupId, userEmail) {
-  const toast = useToast();
+  const toast       = useToast();
+  const fetchingRef = useRef(false); // evitar doble fetch simultáneo
 
-  const [group,           setGroup]          = useState(null);
-  const [members,         setMembers]         = useState([]);
-  const [allExpenses,     setAllExpenses]     = useState([]);
-  const [memberGroupsMap, setMemberGroupsMap] = useState({});
-  // Mapa email → apodo cargado de la BD
-  const [dbNicknames,     setDbNicknames]     = useState({});
-  const [loading,         setLoading]         = useState(true);
-  const [settlements,     setSettlements]     = useState({});
+  // ── Estado inicial desde caché (muestra al instante si existe) ──
+  const cacheKey = `group_${groupId}`;
+  const cached   = getCached(cacheKey);
+  const seed     = cached?.data;
+
+  const [group,           setGroup]          = useState(seed?.group       || null);
+  const [members,         setMembers]         = useState(seed?.members     || []);
+  const [allExpenses,     setAllExpenses]     = useState(seed?.expenses    || []);
+  const [memberGroupsMap, setMemberGroupsMap] = useState(seed?.groupsMap  || {});
+  const [dbNicknames,     setDbNicknames]     = useState(seed?.nicknames  || {});
+  const [loading,         setLoading]         = useState(!seed);          // spinner solo sin caché
+  const [settlements,     setSettlements]     = useState(seed?.settlements || {});
 
   const reloadSettlements = async () => {
     try {
@@ -22,8 +35,14 @@ export function useGroupData(groupId, userEmail) {
     } catch { /* silencioso */ }
   };
 
-  const reload = async () => {
-    setLoading(true);
+  // Fetch principal (silencioso si ya hay caché)
+  const reload = async (opts = {}) => {
+    if (fetchingRef.current) return;
+    fetchingRef.current = true;
+
+    const showSpinner = opts.showSpinner ?? false;
+    if (showSpinner) setLoading(true);
+
     try {
       const [detailRes, expenseRes] = await Promise.all([
         getGroupDetails(groupId),
@@ -31,56 +50,68 @@ export function useGroupData(groupId, userEmail) {
       ]);
 
       const membersData = detailRes.members || [];
+      const nicksMap    = buildNicksMap(membersData);
+      const expenses    = expenseRes.expenses || [];
+
       setGroup(detailRes.group);
       setMembers(membersData);
-      setAllExpenses(expenseRes.expenses || []);
-
-      // Construir mapa de apodos desde la BD
-      const nicksMap = {};
-      membersData.forEach((m) => {
-        if (m.nickname) nicksMap[m.user_email] = m.nickname;
-      });
+      setAllExpenses(expenses);
       setDbNicknames(nicksMap);
 
-      // Settlements: no bloquea
+      // Settlements en background
       getExpenseSettlements(groupId)
         .then((res) => setSettlements(res.settlements || {}))
-        .catch(() => { /* silencioso */ });
+        .catch(() => {});
 
-      // Otros grupos de cada miembro (badges en Miembros)
+      // Badges grupos en común
+      let groupsMap = {};
       try {
-        const groupsRes     = await getGroups(userEmail);
-        const allUserGroups = groupsRes?.groups || [];
-        const otherGroups   = allUserGroups.filter((g) => g.group_id !== groupId);
-        const detailsArr    = await Promise.all(
+        const groupsRes   = await getGroups(userEmail);
+        const allGroups   = groupsRes?.groups || [];
+        const otherGroups = allGroups.filter((g) => g.group_id !== groupId);
+        const detailsArr  = await Promise.all(
           otherGroups.map((g) => getGroupDetails(g.group_id).catch(() => null))
         );
-        const map = {};
         detailsArr.forEach((detail, i) => {
           if (!detail) return;
           const gName = otherGroups[i].name;
           (detail.members || []).forEach((m) => {
-            const email = m.user_email || m.email;
-            if (!map[email]) map[email] = [];
-            map[email].push(gName);
+            const email = m.user_email;
+            if (!groupsMap[email]) groupsMap[email] = [];
+            groupsMap[email].push(gName);
           });
         });
-        setMemberGroupsMap(map);
+        setMemberGroupsMap(groupsMap);
       } catch { /* silencioso */ }
 
+      // Guardar en caché para próxima visita
+      setCached(cacheKey, {
+        group: detailRes.group,
+        members: membersData,
+        expenses,
+        nicknames: nicksMap,
+        groupsMap,
+      });
+
     } catch {
-      toast('Error cargando el grupo', 'error');
+      if (showSpinner) toast('Error cargando el grupo', 'error');
     } finally {
-      setLoading(false);
+      fetchingRef.current = false;
+      if (showSpinner) setLoading(false);
+      else setLoading(false); // siempre quitar spinner
     }
   };
 
-  useEffect(() => { reload(); }, [groupId]);
+  useEffect(() => {
+    const hasSeed = !!getCached(cacheKey)?.data;
+    // Con caché: sin spinner. Sin caché: con spinner.
+    reload({ showSpinner: !hasSeed });
+  }, [groupId]);
 
   return {
     group, members, allExpenses, memberGroupsMap,
     dbNicknames, setDbNicknames,
     loading, settlements, reloadSettlements,
-    reload,
+    reload: () => reload({ showSpinner: false }),
   };
 }
