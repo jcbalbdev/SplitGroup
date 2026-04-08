@@ -113,7 +113,7 @@ export default function DashboardPage() {
             <span className="logo-text">SplitGroup</span>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <span className="text-sm text-muted">{displayName(user?.email)}</span>
+            <span className="text-sm text-muted">{dn(user?.email)}</span>
             <button id="logout-btn" className="btn btn-ghost btn-sm" onClick={logout} title="Cerrar sesión">
               <LogOut size={18} />
             </button>
