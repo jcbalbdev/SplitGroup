@@ -2,14 +2,14 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { getGroups, createGroup, inviteAndCreateMember, deleteGroup } from '../services/api';
+import { getGroups, createGroup, inviteAndCreateMember, deleteGroup, setPassword, loginWithPassword } from '../services/api';
 import { Modal } from '../components/ui/Modal';
 import { useToast } from '../components/ui/Toast';
 import { SkeletonList } from '../components/ui/Skeleton';
 import { Avatar } from '../components/ui/Avatar';
 import { useNicknames } from '../context/NicknamesContext';
 import { getCached, setCached, clearCached } from '../utils/cache';
-import { LogOut, Trash2, Plus, Users, Split, X, Eye, EyeOff } from 'lucide-react';
+import { LogOut, Trash2, Plus, Users, Split, X, Eye, EyeOff, KeyRound } from 'lucide-react';
 
 export default function DashboardPage() {
   const { user, logout } = useAuth();
@@ -31,6 +31,14 @@ export default function DashboardPage() {
   // Delete group
   const [confirmDelete, setConfirmDelete] = useState(null);
   const [deleting, setDeleting] = useState(false);
+  // Change password
+  const [showPasswordModal,  setShowPasswordModal]  = useState(false);
+  const [currentPassword,    setCurrentPassword]    = useState('');
+  const [newPassword,        setNewPassword]        = useState('');
+  const [confirmPassword,    setConfirmPassword]    = useState('');
+  const [changingPassword,   setChangingPassword]   = useState(false);
+  const [showCurrentPass,    setShowCurrentPass]    = useState(false);
+  const [showNewPass,        setShowNewPass]        = useState(false);
 
   useEffect(() => {
     loadGroups();
@@ -112,9 +120,14 @@ export default function DashboardPage() {
             <div className="logo-icon"><Split size={20} /></div>
             <span className="logo-text">SplitGroup</span>
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
             <span className="text-sm text-muted">{dn(user?.email)}</span>
-            <button id="logout-btn" className="btn btn-ghost btn-sm" onClick={logout} title="Cerrar sesión">
+            <button className="btn btn-ghost btn-sm" onClick={() => setShowPasswordModal(true)} title="Cambiar contraseña"
+              style={{ padding: '4px 6px' }}>
+              <KeyRound size={16} />
+            </button>
+            <button id="logout-btn" className="btn btn-ghost btn-sm" onClick={logout} title="Cerrar sesión"
+              style={{ padding: '4px 6px' }}>
               <LogOut size={18} />
             </button>
           </div>
@@ -334,6 +347,84 @@ export default function DashboardPage() {
             </div>
           </div>
         )}
+      </Modal>
+
+      {/* Modal cambiar contraseña */}
+      <Modal isOpen={showPasswordModal} onClose={() => { setShowPasswordModal(false); setCurrentPassword(''); setNewPassword(''); setConfirmPassword(''); }} title="Cambiar contraseña" centered>
+        <form onSubmit={async (e) => {
+          e.preventDefault();
+          if (newPassword.length < 6) { toast('La nueva contraseña debe tener al menos 6 caracteres', 'error'); return; }
+          if (newPassword !== confirmPassword) { toast('Las contraseñas no coinciden', 'error'); return; }
+          setChangingPassword(true);
+          try {
+            // Re-autenticar para verificar contraseña actual
+            await loginWithPassword(user.email, currentPassword);
+            // Cambiar contraseña
+            await setPassword(user.email, newPassword);
+            toast('Contraseña actualizada ✅');
+            setShowPasswordModal(false);
+            setCurrentPassword(''); setNewPassword(''); setConfirmPassword('');
+          } catch (err) {
+            const msg = err?.message || '';
+            if (msg.includes('Invalid login')) {
+              toast('La contraseña actual es incorrecta', 'error');
+            } else {
+              toast(msg || 'Error al cambiar contraseña', 'error');
+            }
+          } finally {
+            setChangingPassword(false);
+          }
+        }} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+
+          <div className="input-group">
+            <label className="input-label">Contraseña actual</label>
+            <div style={{ position: 'relative' }}>
+              <input className="input" type={showCurrentPass ? 'text' : 'password'}
+                placeholder="Tu contraseña actual" value={currentPassword}
+                onChange={e => setCurrentPassword(e.target.value)} required
+                style={{ paddingRight: 44 }} />
+              <button type="button" onClick={() => setShowCurrentPass(!showCurrentPass)}
+                style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)' }}>
+                {showCurrentPass ? <EyeOff size={18} /> : <Eye size={18} />}
+              </button>
+            </div>
+          </div>
+
+          <div className="input-group">
+            <label className="input-label">Nueva contraseña</label>
+            <div style={{ position: 'relative' }}>
+              <input className="input" type={showNewPass ? 'text' : 'password'}
+                placeholder="Mínimo 6 caracteres" value={newPassword}
+                onChange={e => setNewPassword(e.target.value)} required minLength={6}
+                style={{ paddingRight: 44 }} />
+              <button type="button" onClick={() => setShowNewPass(!showNewPass)}
+                style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)' }}>
+                {showNewPass ? <EyeOff size={18} /> : <Eye size={18} />}
+              </button>
+            </div>
+          </div>
+
+          <div className="input-group">
+            <label className="input-label">Confirmar nueva contraseña</label>
+            <input className="input" type={showNewPass ? 'text' : 'password'}
+              placeholder="Repite la nueva contraseña" value={confirmPassword}
+              onChange={e => setConfirmPassword(e.target.value)} required minLength={6} />
+            {confirmPassword && newPassword !== confirmPassword && (
+              <span style={{ fontSize: '0.75rem', color: 'var(--danger)', marginTop: 4 }}>Las contraseñas no coinciden</span>
+            )}
+          </div>
+
+          <div style={{ display: 'flex', gap: 10 }}>
+            <button type="button" className="btn btn-secondary" style={{ flex: 1 }}
+              onClick={() => { setShowPasswordModal(false); setCurrentPassword(''); setNewPassword(''); setConfirmPassword(''); }}>
+              Cancelar
+            </button>
+            <button type="submit" className="btn btn-primary" style={{ flex: 1 }}
+              disabled={changingPassword || !currentPassword || !newPassword || newPassword !== confirmPassword}>
+              {changingPassword ? 'Cambiando...' : '🔒 Cambiar'}
+            </button>
+          </div>
+        </form>
       </Modal>
     </div>
   );
