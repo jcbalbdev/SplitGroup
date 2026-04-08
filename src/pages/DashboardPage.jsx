@@ -2,7 +2,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { getGroups, createGroup, inviteAndCreateMember, deleteGroup, setPassword, loginWithPassword } from '../services/api';
+import { getGroups, createGroup, inviteAndCreateMember, deleteGroup, changePassword } from '../services/api';
 import { Modal } from '../components/ui/Modal';
 import { useToast } from '../components/ui/Toast';
 import { SkeletonList } from '../components/ui/Skeleton';
@@ -357,20 +357,12 @@ export default function DashboardPage() {
           if (newPassword !== confirmPassword) { toast('Las contraseñas no coinciden', 'error'); return; }
           setChangingPassword(true);
           try {
-            // Re-autenticar para verificar contraseña actual
-            await loginWithPassword(user.email, currentPassword);
-            // Cambiar contraseña
-            await setPassword(user.email, newPassword);
+            await changePassword(user.email, currentPassword, newPassword);
             toast('Contraseña actualizada ✅');
             setShowPasswordModal(false);
             setCurrentPassword(''); setNewPassword(''); setConfirmPassword('');
           } catch (err) {
-            const msg = err?.message || '';
-            if (msg.includes('Invalid login')) {
-              toast('La contraseña actual es incorrecta', 'error');
-            } else {
-              toast(msg || 'Error al cambiar contraseña', 'error');
-            }
+            toast(err?.message || 'Error al cambiar contraseña', 'error');
           } finally {
             setChangingPassword(false);
           }

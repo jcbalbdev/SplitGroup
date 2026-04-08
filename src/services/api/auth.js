@@ -37,3 +37,17 @@ export const setPassword = async (email, newPassword) => {
   check(error, 'Error al actualizar contraseña');
   return { success: true };
 };
+
+export const changePassword = async (email, currentPassword, newPassword) => {
+  // Verificar contraseña actual sin cerrar sesión (signInWithPassword no hace signOut)
+  const { error: verifyError } = await supabase.auth.signInWithPassword({
+    email,
+    password: currentPassword,
+  });
+  if (verifyError) throw new Error('La contraseña actual es incorrecta');
+
+  // Ahora actualizar la contraseña
+  const { error: updateError } = await supabase.auth.updateUser({ password: newPassword });
+  check(updateError, 'Error al actualizar contraseña');
+  return { success: true };
+};
