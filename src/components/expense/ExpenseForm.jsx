@@ -9,9 +9,10 @@ import { CategoryPicker } from '../shared/CategoryPicker';
 import { PayerSection } from '../shared/PayerSection';
 import { SplitSection } from '../shared/SplitSection';
 import { useSplitForm } from '../../hooks/useSplitForm';
-import { getUsedCategories } from '../../utils/categories';
+import { getUsedCategories, getCategoryEmoji } from '../../utils/categories';
 import { useNicknames } from '../../context/NicknamesContext';
 import { getLocalDateString } from '../../utils/localDate';
+import { formatAmount } from '../../utils/balanceCalculator';
 
 export function ExpenseForm({
   loading,
@@ -58,35 +59,62 @@ export function ExpenseForm({
     });
   };
 
+  // ── Helpers ──
+  const formatDate = (d) => {
+    if (!d) return '';
+    const [y, m, day] = d.split('-');
+    const months = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
+    return `${parseInt(day)} ${months[parseInt(m) - 1]} ${y}`;
+  };
+
+  const TagPill = ({ children }) => (
+    <span style={{
+      display: 'inline-flex', alignItems: 'center', gap: 4,
+      padding: '4px 12px', borderRadius: 20,
+      background: 'rgba(0, 0, 0, 0.04)',
+      color: 'var(--text-secondary)',
+      fontSize: '0.75rem', fontWeight: 600,
+    }}>{children}</span>
+  );
+
   if (loading) return <FormSkeleton />;
 
   return (
     <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 20 }} className="animate-fade-in">
 
-      {/* ── Monto ── */}
-      <div className="card" style={{ textAlign: 'center' }}>
-        <div className="input-label" style={{ marginBottom: 8 }}>Monto total</div>
-        <input
-          id="expense-amount-input"
-          onWheel={(e) => e.target.blur()}
-          type="number" min="0.01" step="0.01"
-          className="input"
-          placeholder="0.00"
-          value={amount}
-          onChange={(e) => setAmount(e.target.value)}
-          required
-          style={{
-            fontSize: '2.2rem', fontWeight: 800, textAlign: 'center',
-            background: 'transparent', border: 'none',
-            borderBottom: '2px solid var(--border)', borderRadius: 0,
-            color: 'var(--text-primary)', letterSpacing: '-0.02em',
-          }}
-        />
-        <div className="text-xs text-muted" style={{ marginTop: 6 }}>S/. Soles peruanos</div>
+      {/* ── Widget grande con monto ── */}
+      <div style={{ padding: '24px 0 8px' }}>
+        <div style={{
+          fontWeight: 900, fontSize: 'clamp(2.5rem, 12vw, 4rem)',
+          letterSpacing: '-0.04em', lineHeight: 1, marginBottom: 12,
+          color: totalAmount > 0 ? 'var(--text-primary)' : 'var(--text-muted)',
+        }}>
+          {totalAmount > 0 ? formatAmount(totalAmount) : 'S/. 0.00'}
+        </div>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          {category && <TagPill>{getCategoryEmoji(category)} {category}</TagPill>}
+          {date && <TagPill>{formatDate(date)}</TagPill>}
+          {!category && !date && <TagPill>Nuevo gasto</TagPill>}
+        </div>
       </div>
 
-      {/* ── Descripción / Categoría / Fecha ── */}
-      <div className="card" style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+      {/* ── Formulario: Monto, Descripción, Categoría, Fecha ── */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+        <div className="input-group">
+          <label className="input-label" htmlFor="expense-amount-input">Monto total</label>
+          <input
+            id="expense-amount-input"
+            onWheel={(e) => e.target.blur()}
+            type="number" min="0.01" step="0.01"
+            className="input"
+            placeholder="0.00"
+            value={amount}
+            onChange={(e) => setAmount(e.target.value)}
+            required
+            style={{ fontWeight: 700, fontSize: '1.1rem' }}
+          />
+        </div>
+
         <div className="input-group">
           <label className="input-label" htmlFor="expense-desc">Descripción</label>
           <input
@@ -142,11 +170,18 @@ export function ExpenseForm({
       {/* ── Guardar ── */}
       <button
         id="save-expense-btn" type="submit"
-        className="btn btn-primary btn-full"
         disabled={submitting || !isValid()}
-        style={{ marginBottom: 16 }}
+        style={{
+          width: '100%', padding: '14px', borderRadius: 14,
+          border: 'none', cursor: 'pointer',
+          background: submitting || !isValid() ? 'rgba(0,0,0,0.06)' : 'var(--text-primary)',
+          color: submitting || !isValid() ? 'var(--text-muted)' : '#fff',
+          fontSize: '0.9rem', fontWeight: 700, letterSpacing: '-0.01em',
+          transition: 'all 0.2s ease',
+          marginBottom: 16, marginTop: 4,
+        }}
       >
-        {submitting ? 'Guardando…' : submitLabel}
+        {submitting ? 'Guardando…' : 'Guardar gasto'}
       </button>
     </form>
   );

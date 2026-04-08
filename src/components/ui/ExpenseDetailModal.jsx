@@ -8,7 +8,7 @@ import { Modal } from './Modal';
 import { Avatar } from './Avatar';
 import { formatAmount } from '../../utils/balanceCalculator';
 import { useNicknames } from '../../context/NicknamesContext';
-import { Share2, Calendar, Loader2, Split } from 'lucide-react';
+import { Share2, Calendar, Loader2, Trash2 } from 'lucide-react';
 
 function formatDateLong(dateStr) {
   if (!dateStr) return '';
@@ -132,9 +132,11 @@ function Receipt({ item, groupName }) {
 }
 
 // ── Modal principal ───────────────────────────────────────────
-export function ExpenseDetailModal({ isOpen, onClose, item, groupName }) {
+export function ExpenseDetailModal({ isOpen, onClose, item, groupName, onEdit, onDelete }) {
   const receiptRef = useRef(null);
   const [sharing, setSharing] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   if (!item) return null;
 
@@ -144,12 +146,22 @@ export function ExpenseDetailModal({ isOpen, onClose, item, groupName }) {
   const date      = isSingle ? item.expense.date : item.date;
   const total     = isSingle ? parseFloat(item.expense.amount) : item.total;
 
+  const handleDelete = async () => {
+    setDeleting(true);
+    try {
+      await onDelete(item);
+    } finally {
+      setDeleting(false);
+      setConfirmDelete(false);
+    }
+  };
+
   const handleShare = async () => {
     if (!receiptRef.current) return;
     setSharing(true);
     try {
       const canvas = await html2canvas(receiptRef.current, {
-        scale: 3,           // alta resolución
+        scale: 3,
         useCORS: true,
         backgroundColor: '#ffffff',
       });
@@ -157,7 +169,6 @@ export function ExpenseDetailModal({ isOpen, onClose, item, groupName }) {
       canvas.toBlob(async (blob) => {
         const filename = `gasto-${desc.replaceAll(' ', '-').toLowerCase()}.png`;
 
-        // Intentar Web Share API (funciona en móvil)
         if (navigator.share && navigator.canShare && navigator.canShare({ files: [new File([blob], filename, { type: 'image/png' })] })) {
           const file = new File([blob], filename, { type: 'image/png' });
           await navigator.share({
@@ -166,7 +177,6 @@ export function ExpenseDetailModal({ isOpen, onClose, item, groupName }) {
             files: [file],
           });
         } else {
-          // Fallback: descargar la imagen
           const url  = URL.createObjectURL(blob);
           const link = document.createElement('a');
           link.href     = url;
@@ -184,15 +194,96 @@ export function ExpenseDetailModal({ isOpen, onClose, item, groupName }) {
     }
   };
 
+  const handleClose = () => {
+    setConfirmDelete(false);
+    onClose();
+  };
+
   return (
     <>
-      <Modal isOpen={isOpen} onClose={onClose} title="Resumen del gasto" centered>
+      <Modal isOpen={isOpen} onClose={handleClose} centered>
+        {/* Custom header con trash icon */}
+        <div style={{
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          marginBottom: 16,
+        }}>
+          <h3 style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--text-primary)', margin: 0 }}>
+            Resumen del gasto
+          </h3>
+          <div style={{ display: 'flex', gap: 4 }}>
+            {onDelete && (
+              <button
+                onClick={() => setConfirmDelete(true)}
+                style={{
+                  background: 'none', border: 'none', cursor: 'pointer',
+                  padding: 6, borderRadius: 8, color: 'var(--text-muted)',
+                  transition: 'all 0.2s ease',
+                }}
+                onMouseEnter={e => { e.currentTarget.style.color = 'var(--danger)'; e.currentTarget.style.background = 'rgba(255,59,48,0.08)'; }}
+                onMouseLeave={e => { e.currentTarget.style.color = 'var(--text-muted)'; e.currentTarget.style.background = 'none'; }}
+                aria-label="Eliminar gasto"
+              >
+                <Trash2 size={18} />
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* Confirmación de eliminación */}
+        {confirmDelete ? (
+          <div style={{
+            display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16,
+            padding: '24px 0',
+          }}>
+            <div style={{
+              width: 48, height: 48, borderRadius: 14,
+              background: 'rgba(255, 59, 48, 0.08)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+            }}>
+              <Trash2 size={22} color="var(--danger)" />
+            </div>
+            <div style={{ textAlign: 'center' }}>
+              <p style={{ fontWeight: 700, fontSize: '1rem', color: 'var(--text-primary)', margin: '0 0 4px' }}>
+                ¿Eliminar este gasto?
+              </p>
+              <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)', margin: 0 }}>
+                "{desc}" por {formatAmount(total)}
+              </p>
+            </div>
+            <div style={{ display: 'flex', gap: 10, width: '100%' }}>
+              <button
+                onClick={() => setConfirmDelete(false)}
+                style={{
+                  flex: 1, padding: '12px', borderRadius: 12,
+                  border: '1.5px solid rgba(0,0,0,0.08)', background: 'transparent',
+                  color: 'var(--text-primary)', fontSize: '0.85rem', fontWeight: 600,
+                  cursor: 'pointer',
+                }}
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleDelete}
+                disabled={deleting}
+                style={{
+                  flex: 1, padding: '12px', borderRadius: 12,
+                  border: 'none', background: 'var(--danger)', color: '#fff',
+                  fontSize: '0.85rem', fontWeight: 600,
+                  cursor: deleting ? 'wait' : 'pointer',
+                  opacity: deleting ? 0.6 : 1,
+                }}
+              >
+                {deleting ? 'Eliminando…' : 'Sí, eliminar'}
+              </button>
+            </div>
+          </div>
+        ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
 
-          {/* ── Resumen en tema oscuro (vista en la app) ── */}
+          {/* ── Resumen ── */}
           <div style={{
-            background: 'var(--bg-hover)',
-            borderRadius: 'var(--radius-lg)',
+            background: 'rgba(0, 0, 0, 0.03)',
+            borderRadius: 14,
             padding: '20px',
             display: 'flex', flexDirection: 'column', gap: 14,
           }}>
@@ -200,20 +291,20 @@ export function ExpenseDetailModal({ isOpen, onClose, item, groupName }) {
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
               <div>
                 <div style={{ fontWeight: 700, fontSize: '1.05rem', color: 'var(--text-primary)' }}>{desc}</div>
-                <div className="text-xs text-muted" style={{ marginTop: 3 }}>
+                <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: 3 }}>
                   <Calendar size={13} style={{ display: 'inline', verticalAlign: '-2px' }} /> {formatDateLong(date)}
                 </div>
               </div>
-              <div style={{ fontWeight: 800, fontSize: '1.2rem', color: 'var(--primary)' }}>
+              <div style={{ fontWeight: 800, fontSize: '1.2rem', color: 'var(--text-primary)' }}>
                 {formatAmount(total)}
               </div>
             </div>
 
-            <div style={{ borderTop: '1px solid var(--border)' }} />
+            <div style={{ borderTop: '1px solid rgba(0,0,0,0.06)' }} />
 
             {/* Pagadores */}
             <div>
-              <div className="text-xs text-muted" style={{ marginBottom: 10, textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 600 }}>
+              <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginBottom: 10, textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 600 }}>
                 {isSingle ? 'Pagado por' : 'Cada quien pagó'}
               </div>
               {isSingle ? (
@@ -222,7 +313,7 @@ export function ExpenseDetailModal({ isOpen, onClose, item, groupName }) {
                   <span style={{ fontWeight: 600, color: 'var(--text-primary)', flex: 1 }}>
                     {dn(item.expense.paid_by)}
                   </span>
-                  <span className="font-bold" style={{ color: 'var(--primary)' }}>
+                  <span style={{ fontWeight: 700, color: 'var(--text-primary)' }}>
                     {formatAmount(item.expense.amount)}
                   </span>
                 </div>
@@ -233,7 +324,7 @@ export function ExpenseDetailModal({ isOpen, onClose, item, groupName }) {
                     <span style={{ fontWeight: 600, color: 'var(--text-primary)', flex: 1 }}>
                       {dn(sub.paid_by)}
                     </span>
-                    <span className="font-bold" style={{ color: 'var(--primary)' }}>
+                    <span style={{ fontWeight: 700, color: 'var(--text-primary)' }}>
                       {formatAmount(sub.amount)}
                     </span>
                   </div>
@@ -247,15 +338,15 @@ export function ExpenseDetailModal({ isOpen, onClose, item, groupName }) {
               if (!nonPayer.length) return null;
               return (
                 <>
-                  <div style={{ borderTop: '1px solid var(--border)' }} />
+                  <div style={{ borderTop: '1px solid rgba(0,0,0,0.06)' }} />
                   <div>
-                    <div className="text-xs text-muted" style={{ marginBottom: 10, textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 600 }}>
+                    <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginBottom: 10, textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 600 }}>
                       División
                     </div>
                     {item.expense.participants.map((p) => (
                       <div key={p.user_email} style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
-                        <span className="text-sm" style={{ color: 'var(--text-secondary)' }}>{dn(p.user_email)}</span>
-                        <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{formatAmount(p.share_amount)}</span>
+                        <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>{dn(p.user_email)}</span>
+                        <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-primary)' }}>{formatAmount(p.share_amount)}</span>
                       </div>
                     ))}
                   </div>
@@ -264,26 +355,45 @@ export function ExpenseDetailModal({ isOpen, onClose, item, groupName }) {
             })()}
           </div>
 
-          {/* ── Botón compartir ── */}
-          <button
-            id="share-expense-btn"
-            className="btn btn-primary btn-full"
-            onClick={handleShare}
-            disabled={sharing}
-            style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}
-          >
-            {sharing ? (
-              <><Loader2 size={16} className="animate-spin" /> Generando imagen...</>
-            ) : (
-              <>
-                <Share2 size={16} /> Compartir como imagen
-              </>
+          {/* ── Botones ── */}
+          <div style={{ display: 'flex', gap: 10 }}>
+            {onEdit && (
+              <button
+                onClick={() => onEdit(item)}
+                style={{
+                  flex: 1, padding: '12px', borderRadius: 12,
+                  border: '1.5px solid rgba(0,0,0,0.08)', background: 'transparent',
+                  color: 'var(--text-primary)', fontSize: '0.85rem', fontWeight: 600,
+                  cursor: 'pointer', transition: 'all 0.2s ease',
+                }}
+              >
+                Editar
+              </button>
             )}
-          </button>
-          <div className="text-xs text-muted" style={{ textAlign: 'center', marginTop: -12 }}>
-            Comparte el recibo por WhatsApp, Instagram u otras apps
+            <button
+              id="share-expense-btn"
+              onClick={handleShare}
+              disabled={sharing}
+              style={{
+                flex: 1, padding: '12px', borderRadius: 12,
+                border: 'none',
+                background: 'var(--text-primary)', color: '#fff',
+                fontSize: '0.85rem', fontWeight: 600,
+                cursor: sharing ? 'wait' : 'pointer',
+                opacity: sharing ? 0.6 : 1,
+                transition: 'all 0.2s ease',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+              }}
+            >
+              {sharing ? (
+                <><Loader2 size={14} className="animate-spin" /> Generando...</>
+              ) : (
+                <><Share2 size={14} /> Compartir</>
+              )}
+            </button>
           </div>
         </div>
+        )}
       </Modal>
 
       {/* Recibo oculto fuera de pantalla — es lo que se captura como imagen */}

@@ -1,16 +1,16 @@
 // src/components/group/BudgetList.jsx
-// Tab de presupuestos: listado de tarjetas + acciones
+// Tab de presupuestos — rediseñado estilo iOS minimalista
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { BudgetDetailModal } from './BudgetDetailModal';
 import { deleteBudget } from '../../services/api';
 import { useToast } from '../ui/Toast';
 import { formatAmount } from '../../utils/balanceCalculator';
-import { BookMarked, Plus, Trash2, CircleCheck, Clock } from 'lucide-react';
+import { BookMarked, ChevronRight } from 'lucide-react';
 
 const STATUS_LABEL = {
-  active:    { label: 'Activo',     color: 'var(--primary)' },
-  completed: { label: 'Completado', color: 'var(--success)' },
+  active:    { label: 'Activo',     color: 'var(--success)' },
+  completed: { label: 'Completado', color: 'var(--text-muted)' },
   cancelled: { label: 'Cancelado',  color: 'var(--text-muted)' },
 };
 
@@ -18,41 +18,14 @@ export function BudgetList({ budgets = [], groupId, members, onRefresh }) {
   const navigate = useNavigate();
   const toast    = useToast();
   const [selected, setSelected] = useState(null);
-  const [deleting, setDeleting] = useState(null);
-
-  const handleDelete = async (e, budget) => {
-    e.stopPropagation();
-    if (!confirm(`¿Eliminar presupuesto "${budget.name}"?`)) return;
-    setDeleting(budget.budget_id);
-    try {
-      await deleteBudget(budget.budget_id);
-      onRefresh();
-    } catch (err) {
-      console.error('[deleteBudget] error:', err);
-      toast(err?.message || 'Error al eliminar presupuesto', 'error');
-    } finally {
-      setDeleting(null);
-    }
-  };
 
   if (budgets.length === 0) {
     return (
       <div className="animate-fade-in">
-        <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 12 }}>
-          <button id="add-budget-btn" className="btn btn-primary btn-sm"
-            style={{ display: 'flex', alignItems: 'center', gap: 5 }}
-            onClick={() => navigate(`/group/${groupId}/add-budget`)}>
-            <Plus size={14} /> Presupuesto
-          </button>
-        </div>
         <div className="empty-state">
           <div className="empty-state-icon"><BookMarked size={44} strokeWidth={1.5} /></div>
           <div className="empty-state-title">Sin presupuestos</div>
           <div className="empty-state-text">Planifica gastos futuros y conviértelos en gastos reales</div>
-          <button className="btn btn-primary" style={{ marginTop: 8, display: 'flex', alignItems: 'center', gap: 6 }}
-            onClick={() => navigate(`/group/${groupId}/add-budget`)}>
-            <Plus size={16} /> Crear presupuesto
-          </button>
         </div>
       </div>
     );
@@ -60,83 +33,104 @@ export function BudgetList({ budgets = [], groupId, members, onRefresh }) {
 
   return (
     <div className="animate-fade-in">
-      {/* Cabecera */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-        <span className="text-xs text-muted font-semibold" style={{ textTransform: 'uppercase', letterSpacing: '0.06em' }}>
-          {budgets.length} presupuesto{budgets.length !== 1 ? 's' : ''}
-        </span>
-        <button id="add-budget-btn" className="btn btn-primary btn-sm"
-          style={{ display: 'flex', alignItems: 'center', gap: 5 }}
-          onClick={() => navigate(`/group/${groupId}/add-budget`)}>
-          <Plus size={14} /> Presupuesto
-        </button>
-      </div>
-
-      {/* Tarjetas */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-        {budgets.map((budget) => {
+      {/* Lista estilo iOS Settings */}
+      <div style={{
+        borderRadius: 16, overflow: 'hidden',
+        background: 'var(--bg-card)',
+        border: '1px solid rgba(0, 0, 0, 0.04)',
+      }}>
+        {budgets.map((budget, idx) => {
           const allItems    = budget.budget_items || [];
           const items       = allItems.filter(i => i.status !== 'cancelled');
           const total       = items.reduce((s, i) => s + parseFloat(i.amount), 0);
           const executed    = items.filter(i => i.status === 'executed').reduce((s, i) => s + parseFloat(i.amount), 0);
           const pending     = items.filter(i => i.status === 'pending').length;
-          const progress    = total > 0 ? (executed / total) * 100 : 0;
+          const progress    = total > 0 ? Math.min((executed / total) * 100, 100) : 0;
           const statusCfg   = STATUS_LABEL[budget.status] || STATUS_LABEL.active;
+          const isLast      = idx === budgets.length - 1;
 
           return (
             <div
               key={budget.budget_id}
               id={`budget-${budget.budget_id}`}
-              className="list-item card-interactive"
-              style={{ flexDirection: 'column', gap: 10, paddingBottom: 14, cursor: 'pointer' }}
               onClick={() => setSelected(budget)}
-              role="button" tabIndex={0}
-              onKeyDown={(e) => e.key === 'Enter' && setSelected(budget)}
+              style={{
+                padding: '14px 16px',
+                cursor: 'pointer', transition: 'background 0.15s ease',
+                borderBottom: !isLast ? '1px solid rgba(0,0,0,0.04)' : 'none',
+              }}
+              onMouseEnter={e => e.currentTarget.style.background = 'rgba(0,0,0,0.02)'}
+              onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
             >
-              {/* Fila superior */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10, width: '100%' }}>
-                <div style={{ width: 38, height: 38, borderRadius: 10, background: 'rgba(124,92,252,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                  <BookMarked size={18} color="var(--primary)" />
+              {/* Row principal */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                {/* Icon */}
+                <div style={{
+                  width: 40, height: 40, borderRadius: 12,
+                  background: 'rgba(0, 0, 0, 0.04)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  flexShrink: 0,
+                }}>
+                  <BookMarked size={18} color="var(--text-secondary)" />
                 </div>
+
+                {/* Content */}
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <div className="list-item-title" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  <div style={{ fontSize: '0.88rem', fontWeight: 600, color: 'var(--text-primary)', marginBottom: 2 }}>
                     {budget.name}
                   </div>
-                  <div className="list-item-subtitle">
-                    {items.length} item{items.length !== 1 ? 's' : ''}
-                    {pending > 0 && ` · ${pending} pendiente${pending !== 1 ? 's' : ''}`}
-                    {budget.target_date && ` · ${new Date(budget.target_date + 'T12:00:00').toLocaleDateString('es-PE', { day: 'numeric', month: 'short' })}`}
+                  <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
+                    <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontWeight: 500 }}>
+                      {items.length} item{items.length !== 1 ? 's' : ''}
+                      {pending > 0 && ` · ${pending} pendiente${pending !== 1 ? 's' : ''}`}
+                    </span>
+                    <span style={{
+                      display: 'inline-flex', alignItems: 'center', gap: 3,
+                      padding: '1px 6px', borderRadius: 6,
+                      background: budget.status === 'active' ? 'rgba(52, 199, 89, 0.08)' : 'rgba(0,0,0,0.04)',
+                      fontSize: '0.65rem', fontWeight: 600,
+                      color: statusCfg.color,
+                    }}>
+                      {statusCfg.label}
+                    </span>
                   </div>
                 </div>
+
+                {/* Amount + chevron */}
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
                   <div style={{ textAlign: 'right' }}>
-                    <div style={{ fontWeight: 700, fontSize: '0.9rem' }}>{formatAmount(total)}</div>
-                    <div style={{ fontSize: '0.7rem', color: statusCfg.color, fontWeight: 600 }}>{statusCfg.label}</div>
+                    <div style={{ fontSize: '0.88rem', fontWeight: 700, color: 'var(--text-primary)' }}>
+                      {formatAmount(total)}
+                    </div>
+                    {budget.target_date && (
+                      <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', fontWeight: 500 }}>
+                        {new Date(budget.target_date + 'T12:00:00').toLocaleDateString('es-PE', { day: 'numeric', month: 'short' })}
+                      </div>
+                    )}
                   </div>
-                  <button
-                    className="btn btn-ghost btn-icon"
-                    title="Eliminar presupuesto"
-                    disabled={deleting === budget.budget_id}
-                    onClick={(e) => handleDelete(e, budget)}
-                    style={{ color: 'var(--text-muted)', flexShrink: 0 }}>
-                    <Trash2 size={15} />
-                  </button>
+                  <ChevronRight size={16} color="var(--text-muted)" style={{ opacity: 0.5 }} />
                 </div>
               </div>
 
               {/* Barra de progreso */}
               {total > 0 && (
-                <div style={{ width: '100%' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
-                    <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: 3 }}>
-                      <CircleCheck size={11} /> {formatAmount(executed)} ejecutado
-                    </span>
-                    <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: 3 }}>
-                      <Clock size={11} /> {formatAmount(total - executed)} pendiente
-                    </span>
+                <div style={{ marginTop: 8, paddingLeft: 52 }}>
+                  <div style={{
+                    height: 4, background: 'rgba(0, 0, 0, 0.04)',
+                    borderRadius: 99, overflow: 'hidden',
+                  }}>
+                    <div style={{
+                      height: '100%', width: `${progress}%`,
+                      background: progress >= 100 ? 'var(--success)' : 'var(--text-primary)',
+                      borderRadius: 99, transition: 'width 0.4s ease',
+                    }} />
                   </div>
-                  <div style={{ height: 5, background: 'var(--border)', borderRadius: 99, overflow: 'hidden' }}>
-                    <div style={{ height: '100%', width: `${progress}%`, background: progress >= 100 ? 'var(--success)' : 'var(--primary)', borderRadius: 99, transition: 'width 0.4s ease' }} />
+                  <div style={{
+                    display: 'flex', justifyContent: 'space-between', marginTop: 4,
+                    fontSize: '0.65rem', color: 'var(--text-muted)', fontWeight: 500,
+                  }}>
+                    <span>{formatAmount(executed)} ejecutado</span>
+                    <span>{formatAmount(total - executed)} pendiente</span>
                   </div>
                 </div>
               )}

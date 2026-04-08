@@ -4,7 +4,6 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { getGroupDetails, addExpense } from '../services/api';
 import { useToast } from '../components/ui/Toast';
-import { PageHeader } from '../components/ui/PageHeader';
 import { ExpenseForm } from '../components/expense/ExpenseForm';
 import { formatAmount } from '../utils/balanceCalculator';
 import { saveUsedCategory } from '../utils/categories';
@@ -97,10 +96,27 @@ export default function AddExpensePage() {
 
   return (
     <div className="page">
-      <PageHeader
-        title="Nuevo gasto"
-        onBack={() => navigate(`/group/${groupId}`)}
-      />
+      {/* Header sutil */}
+      <div style={{
+        padding: '16px 16px 0', maxWidth: 480, margin: '0 auto', width: '100%',
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+      }}>
+        <h1 style={{
+          fontSize: '1.4rem', fontWeight: 800, letterSpacing: '-0.02em',
+        }}>Nuevo gasto</h1>
+        <button
+          onClick={() => navigate(`/group/${groupId}`)}
+          style={{
+            background: 'rgba(0,0,0,0.04)', border: 'none', borderRadius: 10,
+            padding: '8px 12px', cursor: 'pointer', color: 'var(--text-secondary)',
+            fontSize: '0.8rem', fontWeight: 600, transition: 'all 0.2s ease',
+          }}
+          onMouseEnter={e => e.currentTarget.style.background = 'rgba(0,0,0,0.08)'}
+          onMouseLeave={e => e.currentTarget.style.background = 'rgba(0,0,0,0.04)'}
+        >
+          ← Volver
+        </button>
+      </div>
       <div className="page-content">
         <div className="container">
           <ExpenseForm

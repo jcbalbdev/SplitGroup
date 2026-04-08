@@ -121,13 +121,26 @@ export default function DashboardPage() {
             <span className="logo-text">SplitGroup</span>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            <span className="text-sm text-muted">{dn(user?.email)}</span>
-            <button className="btn btn-ghost btn-sm" onClick={() => setShowPasswordModal(true)} title="Cambiar contraseña"
-              style={{ padding: '4px 6px' }}>
+            <button onClick={() => setShowPasswordModal(true)} title="Cambiar contraseña"
+              style={{
+                background: 'none', border: 'none', cursor: 'pointer',
+                padding: 6, borderRadius: 8, color: 'var(--text-muted)',
+                transition: 'all 0.2s ease',
+              }}
+              onMouseEnter={e => { e.currentTarget.style.color = 'var(--text-primary)'; e.currentTarget.style.background = 'rgba(0,0,0,0.04)'; }}
+              onMouseLeave={e => { e.currentTarget.style.color = 'var(--text-muted)'; e.currentTarget.style.background = 'none'; }}
+            >
               <KeyRound size={16} />
             </button>
-            <button id="logout-btn" className="btn btn-ghost btn-sm" onClick={logout} title="Cerrar sesión"
-              style={{ padding: '4px 6px' }}>
+            <button id="logout-btn" onClick={logout} title="Cerrar sesión"
+              style={{
+                background: 'none', border: 'none', cursor: 'pointer',
+                padding: 6, borderRadius: 8, color: 'var(--text-muted)',
+                transition: 'all 0.2s ease',
+              }}
+              onMouseEnter={e => { e.currentTarget.style.color = 'var(--text-primary)'; e.currentTarget.style.background = 'rgba(0,0,0,0.04)'; }}
+              onMouseLeave={e => { e.currentTarget.style.color = 'var(--text-muted)'; e.currentTarget.style.background = 'none'; }}
+            >
               <LogOut size={18} />
             </button>
           </div>
@@ -136,23 +149,23 @@ export default function DashboardPage() {
 
       <div className="page-content">
         <div className="container">
-          {/* Saludo */}
-          <div style={{ marginBottom: 20, marginTop: 8 }} className="animate-fade-in">
-            <h1 style={{ fontSize: '1.4rem', marginBottom: 4 }}>
+          {/* Widget estilo grande */}
+          <div style={{ padding: '24px 0 8px', marginBottom: 16 }} className="animate-fade-in">
+            <div style={{
+              fontWeight: 900, fontSize: 'clamp(2.5rem, 12vw, 4rem)',
+              letterSpacing: '-0.04em', lineHeight: 1, marginBottom: 12,
+              color: 'var(--text-primary)',
+            }}>
               Hola, {dn(user?.email)}
-            </h1>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <p className="text-sm text-muted">Tus grupos de gastos compartidos</p>
-              {groups.length > 0 && (
-                <button
-                  id="create-group-btn"
-                  className="btn btn-primary btn-sm"
-                  style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '6px 14px', fontSize: '0.82rem' }}
-                  onClick={() => setShowCreateModal(true)}
-                >
-                  <Plus size={14} /> Grupo
-                </button>
-              )}
+            </div>
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+              <span style={{
+                display: 'inline-flex', alignItems: 'center', gap: 4,
+                padding: '4px 12px', borderRadius: 20,
+                background: 'rgba(0, 0, 0, 0.04)',
+                color: 'var(--text-secondary)',
+                fontSize: '0.75rem', fontWeight: 600,
+              }}>Tus grupos de gastos compartidos</span>
             </div>
           </div>
 
@@ -166,11 +179,17 @@ export default function DashboardPage() {
               <div className="empty-state-text">Crea tu primer grupo para empezar a registrar gastos</div>
               <button
                 id="create-first-group-btn"
-                className="btn btn-primary"
-                style={{ marginTop: 8 }}
                 onClick={() => setShowCreateModal(true)}
+                style={{
+                  marginTop: 16, width: '100%', padding: '18px', borderRadius: 'var(--radius-md)',
+                  border: '2px dashed var(--text-muted)', background: 'transparent',
+                  cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  transition: 'all 0.2s ease',
+                }}
+                onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--primary)'; e.currentTarget.style.color = 'var(--primary)'; }}
+                onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--text-muted)'; e.currentTarget.style.color = 'var(--text-muted)'; }}
               >
-                <Plus size={16} /> Crear grupo
+                <Plus size={24} color="currentColor" strokeWidth={2} />
               </button>
             </div>
           ) : (
@@ -194,7 +213,6 @@ export default function DashboardPage() {
                         <div key={email} style={{
                           marginLeft: i === 0 ? 0 : -10,
                           zIndex: 3 - i,
-                          border: '2px solid var(--bg-card)',
                           borderRadius: '50%',
                           position: 'relative',
                         }}>
@@ -205,7 +223,7 @@ export default function DashboardPage() {
                         <div style={{
                           marginLeft: -10, zIndex: 0,
                           width: 28, height: 28, borderRadius: '50%',
-                          background: 'var(--primary)', border: '2px solid var(--bg-card)',
+                          background: 'var(--primary)',
                           display: 'flex', alignItems: 'center', justifyContent: 'center',
                           fontSize: '0.65rem', fontWeight: 700, color: '#fff',
                         }}>
@@ -226,6 +244,22 @@ export default function DashboardPage() {
                   ><Trash2 size={16} /></button>
                 </div>
               ))}
+
+              {/* Botón agregar grupo — estilo card con borde punteado */}
+              <button
+                id="create-group-btn"
+                onClick={() => setShowCreateModal(true)}
+                style={{
+                  width: '100%', padding: '18px', borderRadius: 'var(--radius-md)',
+                  border: '2px dashed var(--text-muted)', background: 'transparent',
+                  cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  color: 'var(--text-muted)', transition: 'all 0.2s ease',
+                }}
+                onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--primary)'; e.currentTarget.style.color = 'var(--primary)'; }}
+                onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--text-muted)'; e.currentTarget.style.color = 'var(--text-muted)'; }}
+              >
+                <Plus size={24} strokeWidth={2} />
+              </button>
             </div>
           )}
         </div>
@@ -407,13 +441,28 @@ export default function DashboardPage() {
           </div>
 
           <div style={{ display: 'flex', gap: 10 }}>
-            <button type="button" className="btn btn-secondary" style={{ flex: 1 }}
-              onClick={() => { setShowPasswordModal(false); setCurrentPassword(''); setNewPassword(''); setConfirmPassword(''); }}>
+            <button type="button"
+              onClick={() => { setShowPasswordModal(false); setCurrentPassword(''); setNewPassword(''); setConfirmPassword(''); }}
+              style={{
+                flex: 1, padding: '12px', borderRadius: 12,
+                border: '1.5px solid rgba(0,0,0,0.08)', background: 'transparent',
+                color: 'var(--text-primary)', fontSize: '0.85rem', fontWeight: 600,
+                cursor: 'pointer',
+              }}>
               Cancelar
             </button>
-            <button type="submit" className="btn btn-primary" style={{ flex: 1 }}
-              disabled={changingPassword || !currentPassword || !newPassword || newPassword !== confirmPassword}>
-              {changingPassword ? 'Cambiando...' : '🔒 Cambiar'}
+            <button type="submit"
+              disabled={changingPassword || !currentPassword || !newPassword || newPassword !== confirmPassword}
+              style={{
+                flex: 1, padding: '12px', borderRadius: 12,
+                border: 'none',
+                background: (changingPassword || !currentPassword || !newPassword || newPassword !== confirmPassword) ? 'rgba(0,0,0,0.06)' : 'var(--text-primary)',
+                color: (changingPassword || !currentPassword || !newPassword || newPassword !== confirmPassword) ? 'var(--text-muted)' : '#fff',
+                fontSize: '0.85rem', fontWeight: 700,
+                cursor: changingPassword ? 'wait' : 'pointer',
+                transition: 'all 0.2s ease',
+              }}>
+              {changingPassword ? 'Cambiando...' : 'Cambiar'}
             </button>
           </div>
         </form>

@@ -3,7 +3,7 @@ import { Avatar } from '../ui/Avatar';
 import { FilterDropdown } from '../ui/FilterDropdown';
 import { formatAmount, formatDate } from '../../utils/balanceCalculator';
 import { getCategoryEmoji } from '../../utils/categories';
-import { Pencil, AlertTriangle, CircleCheck, Tag, CalendarDays } from 'lucide-react';
+import { ChevronRight, Tag, CalendarDays } from 'lucide-react';
 
 export function ExpenseList({
   filteredGrouped,
@@ -21,6 +21,79 @@ export function ExpenseList({
   getEmoji,
   dn,
 }) {
+
+  const StatusBadge = ({ type, text }) => {
+    const colors = {
+      settled: { bg: 'rgba(52, 199, 89, 0.08)', border: 'rgba(52, 199, 89, 0.15)', color: 'var(--success)' },
+      pending: { bg: 'rgba(255, 59, 48, 0.08)', border: 'rgba(255, 59, 48, 0.15)', color: 'var(--danger)' },
+    };
+    const c = colors[type] || colors.settled;
+    return (
+      <span style={{
+        display: 'inline-flex', alignItems: 'center', gap: 4,
+        padding: '3px 8px', borderRadius: 8,
+        background: c.bg, border: `1px solid ${c.border}`,
+        fontSize: '0.68rem', color: c.color, fontWeight: 600,
+        lineHeight: 1.3,
+      }}>{text}</span>
+    );
+  };
+
+  const ExpenseRow = ({ emoji, title, amount, date, participants, onClick, onEdit, statusBadges }) => (
+    <div
+      onClick={onClick}
+      style={{
+        display: 'flex', alignItems: 'center', gap: 12,
+        padding: '14px 16px',
+        cursor: 'pointer', transition: 'background 0.15s ease',
+      }}
+      onMouseEnter={e => e.currentTarget.style.background = 'rgba(0,0,0,0.02)'}
+      onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+    >
+      {/* Emoji icon */}
+      <div style={{
+        width: 40, height: 40, borderRadius: 12,
+        background: 'rgba(0, 0, 0, 0.04)',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        fontSize: '1.1rem', flexShrink: 0,
+      }}>
+        {emoji}
+      </div>
+
+      {/* Content */}
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontSize: '0.88rem', fontWeight: 600, color: 'var(--text-primary)', marginBottom: 2 }}>
+          {title}
+        </div>
+        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
+          {participants.map((p, i) => (
+            <span key={i} style={{
+              display: 'inline-flex', alignItems: 'center', gap: 3,
+              fontSize: '0.72rem', color: 'var(--text-muted)', fontWeight: 500,
+            }}>
+              <Avatar email={p.email} size="xs" />
+              {p.label}
+            </span>
+          ))}
+          {statusBadges}
+        </div>
+      </div>
+
+      {/* Amount + date + chevron */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+        <div style={{ textAlign: 'right' }}>
+          <div style={{ fontSize: '0.88rem', fontWeight: 700, color: 'var(--text-primary)' }}>
+            {formatAmount(amount)}
+          </div>
+          <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', fontWeight: 500 }}>
+            {formatDate(date)}
+          </div>
+        </div>
+        <ChevronRight size={16} color="var(--text-muted)" style={{ opacity: 0.5 }} />
+      </div>
+    </div>
+  );
+
   return (
     <div className="animate-fade-in">
       {/* Filtros */}
@@ -56,96 +129,77 @@ export function ExpenseList({
           <div className="empty-state-icon">🔍</div>
           <div className="empty-state-title">Sin resultados</div>
           <div className="empty-state-text">No hay gastos con los filtros seleccionados</div>
-          <button className="btn btn-secondary btn-sm" style={{ marginTop: 12 }} onClick={() => { setFilterCategory('all'); setDatePreset('all'); }}>
+          <button
+            onClick={() => { setFilterCategory('all'); setDatePreset('all'); }}
+            style={{
+              marginTop: 12, padding: '8px 16px', borderRadius: 10,
+              border: '1.5px solid rgba(0,0,0,0.08)', background: 'transparent',
+              color: 'var(--text-secondary)', fontSize: '0.82rem', fontWeight: 600,
+              cursor: 'pointer',
+            }}
+          >
             Limpiar filtros
           </button>
         </div>
       ) : (
-        <div className="list">
-          {filteredGrouped.map((item) => {
+        <div style={{
+          borderRadius: 16, overflow: 'hidden',
+          background: 'var(--bg-card)',
+          border: '1px solid rgba(0, 0, 0, 0.04)',
+        }}>
+          {filteredGrouped.map((item, idx) => {
+            const isLast = idx === filteredGrouped.length - 1;
+
             if (item.type === 'single') {
-              const exp        = item.expense;
-              const debtInfo   = pendingDebtByExpenseId[exp.expense_id];
+              const exp = item.expense;
+              const debtInfo = pendingDebtByExpenseId[exp.expense_id];
               const expSettled = settlements[exp.expense_id]?.settled;
 
-              return (
-                <div key={exp.expense_id} className="list-item" onClick={() => onExpenseClick(item)}
-                  style={{ flexDirection: 'column', alignItems: 'stretch', gap: 8, cursor: 'pointer' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                    <div style={{ width: 40, height: 40, borderRadius: 10, background: 'var(--bg-hover)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.1rem', flexShrink: 0 }}>
-                      {getEmoji(exp.category, exp.description)}
-                    </div>
-                    <div className="list-item-content">
-                      <div className="list-item-title">{exp.description || 'Sin descripción'}</div>
-                    </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
-                      <div style={{ textAlign: 'right' }}>
-                        <div className="font-bold text-sm">{formatAmount(exp.amount)}</div>
-                        <div className="text-xs text-muted">{formatDate(exp.date)}</div>
-                      </div>
-                      <button className="btn btn-ghost btn-icon" title="Editar gasto"
-                        onClick={(e) => { e.stopPropagation(); onEditExpense(exp); }}
-                        style={{ color: 'var(--text-muted)', fontSize: '1rem', padding: '6px 8px' }}><Pencil size={15} /></button>
-                    </div>
-                  </div>
+              const participants = [{ email: exp.paid_by, label: `${dn(exp.paid_by)} · ${formatAmount(exp.amount)}` }];
 
-                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', paddingLeft: 52, alignItems: 'center' }}>
-                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '3px 10px', borderRadius: 'var(--radius-full)', background: 'var(--bg-hover)', fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
-                      <Avatar email={exp.paid_by} size="xs" />
-                      {dn(exp.paid_by)} · {formatAmount(exp.amount)}
-                    </span>
-                    {debtInfo && (
-                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '3px 10px', borderRadius: 'var(--radius-full)', background: 'rgba(239,68,68,0.12)', border: '1px solid rgba(239,68,68,0.25)', fontSize: '0.72rem', color: 'var(--danger)', fontWeight: 600 }}>
-                        <AlertTriangle size={13} /> {debtInfo.debts.map((d) => `${dn(d.debtor)} debe ${formatAmount(d.amount)}`).join(' · ')}
-                      </span>
-                    )}
-                    {expSettled && !debtInfo && (() => {
-                      const debtors = (exp.participants || []).filter(p => p.user_email !== exp.paid_by && parseFloat(p.share_amount) > 0);
-                      return debtors.length > 0 ? (
-                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '3px 10px', borderRadius: 'var(--radius-full)', background: 'rgba(16,185,129,0.10)', border: '1px solid rgba(16,185,129,0.25)', fontSize: '0.72rem', color: 'var(--success)', fontWeight: 600 }}>
-                          <CircleCheck size={13} /> {debtors.map(d => `${dn(d.user_email)} saldó ${formatAmount(d.share_amount)}`).join(' · ')}
-                        </span>
-                      ) : (
-                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '3px 10px', borderRadius: 'var(--radius-full)', background: 'rgba(16,185,129,0.10)', border: '1px solid rgba(16,185,129,0.25)', fontSize: '0.72rem', color: 'var(--success)', fontWeight: 600 }}>
-                          <CircleCheck size={13} /> Saldado
-                        </span>
-                      );
-                    })()}
-                  </div>
+              let statusBadges = null;
+              if (debtInfo) {
+                statusBadges = debtInfo.debts.map((d, i) => (
+                  <StatusBadge key={i} type="pending" text={`${dn(d.debtor)} debe ${formatAmount(d.amount)}`} />
+                ));
+              } else if (expSettled) {
+                const debtors = (exp.participants || []).filter(p => p.user_email !== exp.paid_by && parseFloat(p.share_amount) > 0);
+                statusBadges = debtors.length > 0
+                  ? debtors.map((d, i) => <StatusBadge key={i} type="settled" text={`${dn(d.user_email)} saldó ${formatAmount(d.share_amount)}`} />)
+                  : <StatusBadge type="settled" text="Saldado" />;
+              }
+
+              return (
+                <div key={exp.expense_id} style={{ borderBottom: !isLast ? '1px solid rgba(0,0,0,0.04)' : 'none' }}>
+                  <ExpenseRow
+                    emoji={getEmoji(exp.category, exp.description)}
+                    title={exp.description || 'Sin descripción'}
+                    amount={exp.amount}
+                    date={exp.date}
+                    participants={participants}
+                    onClick={() => onExpenseClick(item)}
+                    onEdit={() => onEditExpense(exp)}
+                    statusBadges={statusBadges}
+                  />
                 </div>
               );
             }
 
             // Sesión (múltiples pagadores)
             const { sessionId, expenses: subExps, total, description, date } = item;
+            const participants = subExps.map(sub => ({ email: sub.paid_by, label: `${dn(sub.paid_by)} · ${formatAmount(sub.amount)}` }));
+
             return (
-              <div key={sessionId} className="list-item" onClick={() => onExpenseClick(item)}
-                style={{ flexDirection: 'column', alignItems: 'stretch', gap: 8, cursor: 'pointer' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                  <div style={{ width: 40, height: 40, borderRadius: 10, background: 'var(--bg-hover)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.1rem', flexShrink: 0 }}>
-                    {getCategoryEmoji(description)}
-                  </div>
-                  <div className="list-item-content">
-                    <div className="list-item-title">{description || 'Sin descripción'}</div>
-                  </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
-                    <div style={{ textAlign: 'right' }}>
-                      <div className="font-bold text-sm">{formatAmount(total)}</div>
-                      <div className="text-xs text-muted">{formatDate(date)}</div>
-                    </div>
-                    <button className="btn btn-ghost btn-icon" title="Editar gasto"
-                      onClick={(e) => { e.stopPropagation(); onEditSession(item); }}
-                      style={{ color: 'var(--text-muted)', fontSize: '1rem', padding: '6px 8px' }}><Pencil size={15} /></button>
-                  </div>
-                </div>
-                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', paddingLeft: 52 }}>
-                  {subExps.map((sub) => (
-                    <span key={sub.expense_id} style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '3px 10px', borderRadius: 'var(--radius-full)', background: 'var(--bg-hover)', fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
-                      <Avatar email={sub.paid_by} size="xs" />
-                      {dn(sub.paid_by)} · {formatAmount(sub.amount)}
-                    </span>
-                  ))}
-                </div>
+              <div key={sessionId} style={{ borderBottom: !isLast ? '1px solid rgba(0,0,0,0.04)' : 'none' }}>
+                <ExpenseRow
+                  emoji={getCategoryEmoji(description)}
+                  title={description || 'Sin descripción'}
+                  amount={total}
+                  date={date}
+                  participants={participants}
+                  onClick={() => onExpenseClick(item)}
+                  onEdit={() => onEditSession(item)}
+                />
               </div>
             );
           })}

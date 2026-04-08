@@ -1,4 +1,5 @@
 // src/components/group/DebtList.jsx
+// Listado de deudas — estilo iOS minimalista
 import { Avatar } from '../ui/Avatar';
 import { FilterDropdown } from '../ui/FilterDropdown';
 import { formatAmount, formatDate } from '../../utils/balanceCalculator';
@@ -38,7 +39,7 @@ export function DebtList({
         {debtDatePreset === 'custom' && (
           <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
             <input className="input" type="date" value={debtCustomFrom} onChange={(e) => setDebtCustomFrom(e.target.value)} style={{ flex: 1 }} />
-            <span className="text-xs text-muted">–</span>
+            <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>–</span>
             <input className="input" type="date" value={debtCustomTo} min={debtCustomFrom} onChange={(e) => setDebtCustomTo(e.target.value)} style={{ flex: 1 }} />
           </div>
         )}
@@ -52,75 +53,143 @@ export function DebtList({
           <div className="empty-state-text">No hay gastos con deuda en este período</div>
         </div>
       ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
 
           {/* Pendientes */}
           {filteredPendingDebts.length > 0 && (
             <>
-              <div className="text-xs text-muted font-semibold" style={{ paddingLeft: 4, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 4 }}>
+              <div style={{
+                fontSize: '0.72rem', color: 'var(--text-muted)', fontWeight: 600,
+                textTransform: 'uppercase', letterSpacing: '0.06em', paddingLeft: 4,
+              }}>
                 Pendientes · {filteredPendingDebts.length}
               </div>
-              {filteredPendingDebts.map((ed) => (
-                <div key={ed.expenseId} style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)', padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: 10 }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span style={{ fontWeight: 700, fontSize: '0.9rem', color: 'var(--text-primary)' }}>
-                      {getEmoji(ed.category, ed.description)} {ed.description}
-                    </span>
-                    <span className="text-xs text-muted">{formatDate(ed.date)}</span>
-                  </div>
-                  {ed.debts.map((d) => (
-                    <div key={d.debtor} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                      <Avatar email={d.debtor} size="sm" />
-                      <div style={{ flex: 1, display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 4 }}>
-                        <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{dn(d.debtor)}</span>
-                        <span className="text-xs text-muted"> debe </span>
-                        <span className="text-sm font-bold" style={{ color: 'var(--danger)' }}>{formatAmount(d.amount)}</span>
-                        <span className="text-xs text-muted"> a </span>
-                        <Avatar email={ed.paidBy} size="xs" />
-                        <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{dn(ed.paidBy)}</span>
-                      </div>
-                      <button
-                        id={`settle-btn-${ed.expenseId}`}
-                        className="btn btn-success btn-sm"
-                        style={{ flexShrink: 0 }}
-                        onClick={() => onSettle(ed.expenseId)}
-                      >
-                        <Check size={14} /> Pagar
-                      </button>
+              <div style={{
+                borderRadius: 16, overflow: 'hidden',
+                background: 'var(--bg-card)',
+                border: '1px solid rgba(0, 0, 0, 0.04)',
+              }}>
+                {filteredPendingDebts.map((ed, idx) => (
+                  <div key={ed.expenseId} style={{
+                    padding: '14px 16px',
+                    borderBottom: idx < filteredPendingDebts.length - 1 ? '1px solid rgba(0,0,0,0.04)' : 'none',
+                  }}>
+                    {/* Expense header */}
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+                      <span style={{ fontWeight: 600, fontSize: '0.88rem', color: 'var(--text-primary)' }}>
+                        {getEmoji(ed.category, ed.description)} {ed.description}
+                      </span>
+                      <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)', fontWeight: 500 }}>
+                        {formatDate(ed.date)}
+                      </span>
                     </div>
-                  ))}
-                </div>
-              ))}
+                    {/* Deudas individuales */}
+                    {ed.debts.map((d) => (
+                      <div key={d.debtor} style={{
+                        display: 'flex', alignItems: 'center', gap: 8,
+                        marginTop: 6,
+                      }}>
+                        <Avatar email={d.debtor} size="sm" />
+                        <div style={{ flex: 1, display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 4 }}>
+                          <span style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-primary)' }}>
+                            {dn(d.debtor)}
+                          </span>
+                          <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>debe</span>
+                          <span style={{ fontSize: '0.82rem', fontWeight: 700, color: 'var(--danger)' }}>
+                            {formatAmount(d.amount)}
+                          </span>
+                          <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>a</span>
+                          <Avatar email={ed.paidBy} size="xs" />
+                          <span style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-primary)' }}>
+                            {dn(ed.paidBy)}
+                          </span>
+                        </div>
+                        <button
+                          id={`settle-btn-${ed.expenseId}`}
+                          onClick={() => onSettle(ed.expenseId)}
+                          style={{
+                            padding: '6px 12px', borderRadius: 8, border: 'none',
+                            background: 'var(--text-primary)', color: '#fff',
+                            fontSize: '0.72rem', fontWeight: 600, cursor: 'pointer',
+                            display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0,
+                          }}
+                        >
+                          <Check size={12} /> Pagar
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                ))}
+              </div>
             </>
           )}
 
           {/* Saldadas */}
           {filteredSettledDebts.length > 0 && (
             <>
-              <div className="text-xs text-muted font-semibold" style={{ paddingLeft: 4, textTransform: 'uppercase', letterSpacing: '0.06em', marginTop: 8, marginBottom: 4 }}>
-                <CircleCheck size={13} /> Saldadas · {filteredSettledDebts.length}
+              <div style={{
+                fontSize: '0.72rem', color: 'var(--text-muted)', fontWeight: 600,
+                textTransform: 'uppercase', letterSpacing: '0.06em', paddingLeft: 4,
+                display: 'flex', alignItems: 'center', gap: 4,
+              }}>
+                <CircleCheck size={12} /> Saldadas · {filteredSettledDebts.length}
               </div>
-              {filteredSettledDebts.map((ed) => (
-                <div key={ed.expenseId} style={{ background: 'rgba(16,185,129,0.06)', border: '1px solid rgba(16,185,129,0.2)', borderRadius: 'var(--radius-lg)', padding: '12px 16px', display: 'flex', flexDirection: 'column', gap: 8, opacity: 0.75 }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
-                      {getEmoji(ed.category, ed.description)} {ed.description}
-                    </span>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <span className="text-xs" style={{ color: 'var(--success)', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: 3 }}><CircleCheck size={13} /> Saldado</span>
-                      <button className="btn btn-ghost btn-sm" style={{ color: 'var(--text-muted)', fontSize: '0.72rem', padding: '3px 8px', display: 'inline-flex', alignItems: 'center', gap: 3 }} onClick={() => onUnsettle(ed.expenseId)}><RotateCcw size={12} /> Reactivar</button>
+              <div style={{
+                borderRadius: 16, overflow: 'hidden',
+                background: 'var(--bg-card)',
+                border: '1px solid rgba(0, 0, 0, 0.04)',
+              }}>
+                {filteredSettledDebts.map((ed, idx) => (
+                  <div key={ed.expenseId} style={{
+                    padding: '12px 16px', opacity: 0.65,
+                    borderBottom: idx < filteredSettledDebts.length - 1 ? '1px solid rgba(0,0,0,0.04)' : 'none',
+                  }}>
+                    {/* Header */}
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                      <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', fontWeight: 500 }}>
+                        {getEmoji(ed.category, ed.description)} {ed.description}
+                      </span>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <span style={{
+                          display: 'inline-flex', alignItems: 'center', gap: 3,
+                          padding: '2px 6px', borderRadius: 6,
+                          background: 'rgba(52, 199, 89, 0.08)',
+                          fontSize: '0.65rem', fontWeight: 600, color: 'var(--success)',
+                        }}>
+                          ✓ Saldado
+                        </span>
+                        <button
+                          onClick={() => onUnsettle(ed.expenseId)}
+                          style={{
+                            background: 'none', border: 'none', cursor: 'pointer',
+                            padding: '2px 6px', borderRadius: 6,
+                            fontSize: '0.65rem', fontWeight: 500, color: 'var(--text-muted)',
+                            display: 'inline-flex', alignItems: 'center', gap: 3,
+                            transition: 'all 0.2s ease',
+                          }}
+                          onMouseEnter={e => e.currentTarget.style.background = 'rgba(0,0,0,0.04)'}
+                          onMouseLeave={e => e.currentTarget.style.background = 'none'}
+                        >
+                          <RotateCcw size={10} /> Reactivar
+                        </button>
+                      </div>
                     </div>
+                    {/* Deudas */}
+                    {ed.debts.map((d) => (
+                      <div key={d.debtor} style={{ display: 'flex', alignItems: 'center', gap: 6, paddingLeft: 2, marginTop: 4 }}>
+                        <Avatar email={d.debtor} size="xs" />
+                        <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+                          {dn(d.debtor)} pagó {formatAmount(d.amount)} a
+                        </span>
+                        <Avatar email={ed.paidBy} size="xs" />
+                        <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+                          {dn(ed.paidBy)}
+                        </span>
+                      </div>
+                    ))}
                   </div>
-                  {ed.debts.map((d) => (
-                    <div key={d.debtor} style={{ display: 'flex', alignItems: 'center', gap: 8, paddingLeft: 4 }}>
-                      <Avatar email={d.debtor} size="xs" />
-                      <span className="text-xs text-muted">{dn(d.debtor)} pagó {formatAmount(d.amount)} a </span>
-                      <Avatar email={ed.paidBy} size="xs" />
-                      <span className="text-xs text-muted">{dn(ed.paidBy)}</span>
-                    </div>
-                  ))}
-                </div>
-              ))}
+                ))}
+              </div>
             </>
           )}
 

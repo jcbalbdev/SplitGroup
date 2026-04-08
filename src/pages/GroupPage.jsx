@@ -5,10 +5,9 @@ import { useAuth } from '../context/AuthContext';
 import { Modal } from '../components/ui/Modal';
 import { useToast } from '../components/ui/Toast';
 import { SkeletonList } from '../components/ui/Skeleton';
-import { PageHeader } from '../components/ui/PageHeader';
 import { ExpenseDetailModal } from '../components/ui/ExpenseDetailModal';
 import { AvatarPickerModal } from '../components/ui/AvatarPickerModal';
-import { setGroupNickname } from '../services/api';
+import { setGroupNickname, deleteExpense, deleteExpenseSession } from '../services/api';
 import { useNicknames } from '../context/NicknamesContext';
 import { getCategoryEmoji } from '../utils/categories';
 import { CreditCard, Receipt, Users, Plus, BookMarked } from 'lucide-react';
@@ -26,10 +25,10 @@ import { MemberList } from '../components/group/MemberList';
 import { BudgetList } from '../components/group/BudgetList';
 
 const TABS = [
-  { key: 'balances', label: 'Deudas',       icon: CreditCard  },
   { key: 'expenses', label: 'Gastos',       icon: Receipt     },
-  { key: 'members',  label: 'Miembros',     icon: Users       },
   { key: 'budgets',  label: 'Presupuestos', icon: BookMarked  },
+  { key: 'balances', label: 'Deudas',       icon: CreditCard  },
+  { key: 'members',  label: 'Miembros',     icon: Users       },
 ];
 
 export default function GroupPage() {
@@ -39,7 +38,7 @@ export default function GroupPage() {
   const location     = useLocation();
   const toast        = useToast();
 
-  const [activeTab, setActiveTab] = useState(location.state?.activeTab || 'balances');
+  const [activeTab, setActiveTab] = useState(location.state?.activeTab || 'expenses');
   const [editingNick,      setEditingNick]      = useState(null);
   const [savingNick,       setSavingNick]       = useState(false);
   const [showAvatarPicker, setShowAvatarPicker] = useState(false);
@@ -51,7 +50,7 @@ export default function GroupPage() {
     group, members, allExpenses, memberGroupsMap,
     dbNicknames, setDbNicknames,
     loading, settlements, reloadSettlements,
-    budgets, reloadBudgets,
+    budgets, reloadBudgets, reload,
   } = useGroupData(groupId, user?.email);
 
   const { dn, setOneNickname } = useNicknames();
@@ -96,18 +95,33 @@ export default function GroupPage() {
   // ── Render ────────────────────────────────────────────────────
   return (
     <div className="page">
-      <PageHeader
-        title={loading ? '...' : group?.name}
-        subtitle={`${members.length} miembros`}
-        onBack={() => navigate('/')}
-        action={
-          <button id="add-expense-fab-header" className="btn btn-primary btn-sm" onClick={() => navigate(`/group/${groupId}/add-expense`)}>
-            <Plus size={14} /> Gasto
-          </button>
-        }
-      />
+      {/* Header sutil */}
+      <div style={{
+        padding: '16px 16px 0', maxWidth: 480, margin: '0 auto', width: '100%',
+        display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between',
+      }}>
+        <div>
+          <h1 style={{
+            fontSize: '1.6rem', fontWeight: 800, letterSpacing: '-0.02em', lineHeight: 1.2,
+          }}>{loading ? '...' : group?.name}</h1>
+          <p className="text-sm text-muted" style={{ marginTop: 2 }}>{members.length} miembros</p>
+        </div>
+        <button
+          onClick={() => navigate('/')}
+          style={{
+            background: 'rgba(0,0,0,0.04)', border: 'none', borderRadius: 10,
+            padding: '8px 12px', cursor: 'pointer', color: 'var(--text-secondary)',
+            fontSize: '0.8rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 4,
+            transition: 'all 0.2s ease',
+          }}
+          onMouseEnter={e => e.currentTarget.style.background = 'rgba(0,0,0,0.08)'}
+          onMouseLeave={e => e.currentTarget.style.background = 'rgba(0,0,0,0.04)'}
+        >
+          ← Grupos
+        </button>
+      </div>
 
-      <div className="page-content">
+      <div className="page-content" style={{ paddingBottom: 120 }}>
         <div className="container">
           {loading ? <SkeletonList count={4} /> : (
             <>
@@ -119,15 +133,31 @@ export default function GroupPage() {
                 filteredGrouped={expenseFilters.filteredGrouped}
                 totalLabel={expenseFilters.totalLabel}
                 membersCount={members.length}
+                budgets={budgets}
               />
 
-              <div className="tabs" style={{ marginBottom: 12 }}>
-                {TABS.map(({ key, label, icon: Icon }) => (
-                  <div key={key} id={`tab-${key}`} className={`tab ${activeTab === key ? 'active' : ''}`} onClick={() => setActiveTab(key)}>
-                    <Icon size={15} /> {label}
-                  </div>
-                ))}
-              </div>
+              {/* Botón agregar — contextual según la tab activa */}
+              {(activeTab === 'expenses' || activeTab === 'budgets') && (
+                <button
+                  id={activeTab === 'expenses' ? 'add-expense-btn' : 'add-budget-btn-dashed'}
+                  onClick={() => navigate(
+                    activeTab === 'expenses'
+                      ? `/group/${groupId}/add-expense`
+                      : `/group/${groupId}/add-budget`
+                  )}
+                  style={{
+                    width: '100%', padding: '16px', borderRadius: 'var(--radius-md)',
+                    border: '2px dashed var(--text-muted)', background: 'transparent',
+                    cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    color: 'var(--text-muted)', transition: 'all 0.2s ease',
+                    marginBottom: 16,
+                  }}
+                  onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--primary)'; e.currentTarget.style.color = 'var(--primary)'; }}
+                  onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--text-muted)'; e.currentTarget.style.color = 'var(--text-muted)'; }}
+                >
+                  <Plus size={22} strokeWidth={2} />
+                </button>
+              )}
 
               {activeTab === 'balances' && (
                 <DebtList
@@ -200,7 +230,77 @@ export default function GroupPage() {
         </div>
       </div>
 
-      <ExpenseDetailModal isOpen={!!selectedExpense} onClose={() => setSelectedExpense(null)} item={selectedExpense} groupName={group?.name} />
+      {/* ── Bottom Segmented Control (iOS style) ─────────── */}
+      {!loading && (
+        <div style={{
+          position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 100,
+          display: 'flex', justifyContent: 'center',
+          paddingBottom: 'env(safe-area-inset-bottom, 12px)',
+          padding: '0 20px 12px',
+          pointerEvents: 'none',
+        }}>
+          <nav style={{
+            display: 'flex', gap: 4,
+            background: 'rgba(255, 255, 255, 0.95)',
+            backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)',
+            borderRadius: 16,
+            padding: 5,
+            boxShadow: '0 2px 20px rgba(0, 0, 0, 0.08), 0 0 0 1px rgba(0, 0, 0, 0.04)',
+            maxWidth: 400,
+            width: '100%',
+            pointerEvents: 'auto',
+          }}>
+            {TABS.map(({ key, label, icon: Icon }) => {
+              const isActive = activeTab === key;
+              return (
+                <button key={key} id={`tab-${key}`}
+                  onClick={() => setActiveTab(key)}
+                  style={{
+                    flex: 1,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+                    background: 'none', cursor: 'pointer',
+                    padding: '10px 4px', borderRadius: 12,
+                    color: isActive ? 'var(--text-primary)' : 'var(--text-muted)',
+                    border: isActive ? '1.5px solid rgba(0, 0, 0, 0.1)' : '1.5px solid transparent',
+                    transition: 'all 0.2s ease',
+                    fontSize: '0.78rem', fontWeight: isActive ? 700 : 500,
+                  }}>
+                  {label}
+                </button>
+              );
+            })}
+          </nav>
+        </div>
+      )}
+
+      <ExpenseDetailModal
+        isOpen={!!selectedExpense} onClose={() => setSelectedExpense(null)}
+        item={selectedExpense} groupName={group?.name}
+        onEdit={(item) => {
+          setSelectedExpense(null);
+          if (item.type === 'single') {
+            navigate(`/group/${groupId}/expense/${item.expense.expense_id}/edit`);
+          } else {
+            navigate(`/group/${groupId}/session/${item.sessionId}/edit`, {
+              state: { sessionExpenses: item.expenses, description: item.description, date: item.date, total: item.total }
+            });
+          }
+        }}
+        onDelete={async (item) => {
+          try {
+            if (item.type === 'single') {
+              await deleteExpense(item.expense.expense_id);
+            } else {
+              await deleteExpenseSession(item.sessionId, groupId);
+            }
+            toast('Gasto eliminado');
+            setSelectedExpense(null);
+            reload();
+          } catch (err) {
+            toast(err.message || 'Error al eliminar', 'error');
+          }
+        }}
+      />
       <AvatarPickerModal isOpen={showAvatarPicker} onClose={() => setShowAvatarPicker(false)} email={user?.email || ''} onSaved={() => setAvatarVersion((v) => v + 1)} />
 
       {/* Modal editar apodo */}

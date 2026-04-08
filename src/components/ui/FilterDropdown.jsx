@@ -1,28 +1,16 @@
 // src/components/ui/FilterDropdown.jsx
-// Botón dropdown con portal (position:fixed) para filtros.
-// Self-contained: maneja su propio estado open/close, refs y click-outside.
-// No queda cortado por contenedores con overflow:hidden ni transforms CSS.
+// Botón dropdown con portal — estilo iOS minimalista.
 
 import { useState, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { X, ChevronDown } from 'lucide-react';
 
-/**
- * @param {Array}    items       - [{ key, emoji, label }]
- * @param {string}   activeKey   - key actualmente seleccionada
- * @param {Function} onSelect    - callback(key)
- * @param {string}   [icon]      - emoji del botón cuando no hay filtro activo
- * @param {string}   [label]     - texto del botón cuando no hay filtro activo
- * @param {boolean}  [showClear] - muestra botón ✕ al lado cuando hay filtro activo
- * @param {Function} [onClear]   - callback para limpiar; si no se pasa usa onSelect('all')
- */
-export function FilterDropdown({ items, activeKey, onSelect, icon = '🏷️', label = 'Filtro', showClear = true, onClear }) {
+export function FilterDropdown({ items, activeKey, onSelect, icon, label = 'Filtro', showClear = true, onClear }) {
   const [open, setOpen]   = useState(false);
   const [pos,  setPos]    = useState({ top: 0, left: 0 });
   const btnRef  = useRef(null);
   const menuRef = useRef(null);
 
-  // Click-outside: cierra el menú salvo que se haga clic en el propio botón
   useEffect(() => {
     if (!open) return;
     const handle = (e) => {
@@ -58,19 +46,18 @@ export function FilterDropdown({ items, activeKey, onSelect, icon = '🏷️', l
         onClick={toggle}
         style={{
           display: 'inline-flex', alignItems: 'center', gap: 6,
-          padding: '6px 14px', borderRadius: 'var(--radius-full)',
-          background: isActive ? 'var(--primary)' : 'var(--bg-hover)',
-          border: `1px solid ${isActive ? 'var(--primary)' : 'var(--border)'}`,
-          color: isActive ? '#fff' : 'var(--text-secondary)',
-          fontWeight: 600, fontSize: '0.82rem',
+          padding: '7px 14px', borderRadius: 12,
+          background: isActive ? 'rgba(0, 0, 0, 0.06)' : 'transparent',
+          border: `1.5px solid ${isActive ? 'rgba(0, 0, 0, 0.1)' : 'rgba(0, 0, 0, 0.08)'}`,
+          color: isActive ? 'var(--text-primary)' : 'var(--text-muted)',
+          fontWeight: isActive ? 700 : 500, fontSize: '0.82rem',
           cursor: 'pointer', fontFamily: 'inherit', transition: 'all 0.18s',
         }}
       >
-        {isActive && active ? <>{active.emoji} {active.label}</> : <>{icon} {label}</>}
-        <ChevronDown size={12} style={{ opacity: 0.7 }} />
+        {isActive && active ? active.label : label}
+        <ChevronDown size={12} style={{ opacity: 0.5 }} />
       </button>
 
-      {/* Botón limpiar */}
       {showClear && isActive && (
         <button
           onClick={handleClear}
@@ -81,20 +68,21 @@ export function FilterDropdown({ items, activeKey, onSelect, icon = '🏷️', l
         ><X size={14} /></button>
       )}
 
-      {/* Menú portal */}
       {open && createPortal(
         <div
           ref={menuRef}
           style={{
             position: 'fixed', top: pos.top, left: pos.left,
             zIndex: 99999,
-            background: 'var(--bg-card)', border: '1px solid var(--border)',
-            borderRadius: 'var(--radius-lg)', padding: '6px', minWidth: 190,
-            boxShadow: '0 12px 40px rgba(0,0,0,0.7)',
-            display: 'flex', flexDirection: 'column', gap: 2,
+            background: 'rgba(255, 255, 255, 0.98)',
+            backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)',
+            border: '1px solid rgba(0, 0, 0, 0.06)',
+            borderRadius: 14, padding: '4px', minWidth: 180,
+            boxShadow: '0 8px 30px rgba(0, 0, 0, 0.1)',
+            display: 'flex', flexDirection: 'column', gap: 1,
           }}
         >
-          {items.map(({ key, emoji, label: itemLabel }) => {
+          {items.map(({ key, label: itemLabel }) => {
             const isSelected = activeKey === key;
             return (
               <button
@@ -102,16 +90,16 @@ export function FilterDropdown({ items, activeKey, onSelect, icon = '🏷️', l
                 onClick={() => { onSelect(key); setOpen(false); }}
                 style={{
                   display: 'flex', alignItems: 'center', gap: 8, width: '100%',
-                  padding: '9px 14px', borderRadius: 'var(--radius-md)',
-                  background: isSelected ? 'rgba(124,92,252,0.18)' : 'transparent',
+                  padding: '10px 14px', borderRadius: 10,
+                  background: isSelected ? 'rgba(0, 0, 0, 0.04)' : 'transparent',
                   border: 'none',
-                  color: isSelected ? 'var(--primary)' : 'var(--text-secondary)',
-                  fontWeight: isSelected ? 700 : 400, fontSize: '0.85rem',
+                  color: isSelected ? 'var(--text-primary)' : 'var(--text-secondary)',
+                  fontWeight: isSelected ? 700 : 500, fontSize: '0.85rem',
                   cursor: 'pointer', textAlign: 'left', fontFamily: 'inherit',
                   transition: 'background 0.15s',
                 }}
               >
-                {emoji} {itemLabel}
+                {itemLabel}
               </button>
             );
           })}

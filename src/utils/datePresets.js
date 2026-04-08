@@ -7,7 +7,7 @@ export const DATE_PRESETS = [
   { key: 'month',      label: 'Este mes' },
   { key: 'last_month', label: 'Mes anterior' },
   { key: 'year',       label: 'Este año' },
-  { key: 'custom',     label: '📅 Personalizado' },
+  { key: 'custom',     label: 'Personalizado' },
 ];
 
 /** Formatea un Date como YYYY-MM-DD en zona local (NO UTC). */
