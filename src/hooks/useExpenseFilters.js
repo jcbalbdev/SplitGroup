@@ -1,6 +1,6 @@
 // src/hooks/useExpenseFilters.js
 import { useState, useMemo } from 'react';
-import { detectCategory, getCategoryMeta, CATEGORIES } from '../utils/categories';
+import { getCategoryEmoji } from '../utils/categories';
 import { DATE_PRESETS, getDateRange } from '../utils/datePresets';
 import { formatDate, formatMonth } from '../utils/balanceCalculator';
 
@@ -20,27 +20,13 @@ function groupBySession(exps) {
   return result;
 }
 
-export function useExpenseFilters(allExpenses, categoryOverrides) {
+export function useExpenseFilters(allExpenses) {
   const [filterCategory, setFilterCategory] = useState('all');
   const [datePreset,     setDatePreset]     = useState('month');
   const [customFrom,     setCustomFrom]     = useState('');
   const [customTo,       setCustomTo]       = useState('');
 
-  // Helper: clave de categoría (fuente de verdad = backend, fallback = localStorage override, luego auto-detección)
-  const getExpenseCategoryKey = (exp) => {
-    // 1. Override local (feedback inmediato tras editar en este dispositivo)
-    const ov = categoryOverrides[exp.expense_id];
-    if (ov) return ov.key === 'otros' ? `custom_${ov.label}` : ov.key;
-    // 2. Campo category del backend (sincronizado entre dispositivos)
-    const cat = (exp.category || '').trim();
-    if (cat && cat !== 'otros') {
-      const found = CATEGORIES.find((c) => c.key === cat);
-      if (found) return found.key;     // categoría predefinida (ej: 'comida')
-      return `custom_${cat}`;          // categoría personalizada (ej: 'Desayuno')
-    }
-    // 3. Auto-detección por descripción
-    return detectCategory(exp.description);
-  };
+  const getCategoryKey = (exp) => (exp.category || 'otros').trim().toLowerCase();
 
   const activeDateRange = useMemo(
     () => getDateRange(datePreset, customFrom, customTo),
@@ -49,16 +35,14 @@ export function useExpenseFilters(allExpenses, categoryOverrides) {
 
   const filteredRawExpenses = useMemo(() => {
     return allExpenses.filter((exp) => {
-      if (filterCategory !== 'all') {
-        if (getExpenseCategoryKey(exp) !== filterCategory) return false;
-      }
+      if (filterCategory !== 'all' && getCategoryKey(exp) !== filterCategory) return false;
       const { from, to } = activeDateRange;
       const expDate = (exp.date || '').substring(0, 10);
       if (from && expDate < from) return false;
       if (to   && expDate > to)   return false;
       return true;
     });
-  }, [allExpenses, filterCategory, activeDateRange, categoryOverrides]);
+  }, [allExpenses, filterCategory, activeDateRange]);
 
   const filteredGrouped = useMemo(() => groupBySession(filteredRawExpenses), [filteredRawExpenses]);
 
@@ -68,14 +52,13 @@ export function useExpenseFilters(allExpenses, categoryOverrides) {
   );
 
   const availableCategories = useMemo(() => {
-    const keys = new Set(allExpenses.map((e) => getExpenseCategoryKey(e)));
+    const keys = new Set(allExpenses.map((e) => getCategoryKey(e)));
     return ['all', ...Array.from(keys)];
-  }, [allExpenses, categoryOverrides]);
+  }, [allExpenses]);
 
   const totalLabel = useMemo(() => {
-    const catPart = filterCategory !== 'all'
-      ? `· ${getCategoryMeta(filterCategory).emoji} ${getCategoryMeta(filterCategory).label}`
-      : '';
+    const catKey = filterCategory !== 'all' ? filterCategory : '';
+    const catPart = catKey ? `· ${getCategoryEmoji(catKey)} ${catKey}` : '';
     if (datePreset === 'all')   return `Total general ${catPart}`;
     if (datePreset === 'week')  return `Esta semana ${catPart}`;
     if (datePreset === 'month') { const { from } = getDateRange('month'); return `${formatMonth(from)} ${catPart}`; }
@@ -92,7 +75,7 @@ export function useExpenseFilters(allExpenses, categoryOverrides) {
     customTo, setCustomTo,
     filteredRawExpenses, filteredGrouped, filteredTotal,
     availableCategories, totalLabel, activeDateRange,
-    getExpenseCategoryKey,
+    getCategoryKey,
     DATE_PRESET_ITEMS: DATE_PRESETS.map(({ key, label }) => ({ key, emoji: '📅', label })),
   };
 }

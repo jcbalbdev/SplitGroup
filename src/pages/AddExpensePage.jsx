@@ -9,6 +9,7 @@ import { ExpenseForm } from '../components/expense/ExpenseForm';
 import { formatAmount } from '../utils/balanceCalculator';
 import { saveUsedCategory } from '../utils/categories';
 import { getLocalDateString } from '../utils/localDate';
+import { clearCached } from '../utils/cache';
 
 export default function AddExpensePage() {
   const { groupId } = useParams();
@@ -64,6 +65,7 @@ export default function AddExpensePage() {
             amount:       paid,
             paid_by:      payer.email,
             description:  label,
+            category:     category || 'otros',
             date,
             session_id:   sessionId,
             participants: [{ user_email: payer.email, share_amount: paid }],
@@ -80,9 +82,11 @@ export default function AddExpensePage() {
               ? ((parseFloat(p.value) / 100) * amount).toFixed(2)
               : parseFloat(p.value),
           }));
-        await addExpense({ group_id: groupId, amount, paid_by: paidBy, description: label, date, participants: parts });
+        await addExpense({ group_id: groupId, amount, paid_by: paidBy, description: label, category: category || 'otros', date, participants: parts });
         toast('Gasto agregado 🎉');
       }
+      // Invalidar caché del grupo para que se muestren los gastos nuevos
+      clearCached(`group_${groupId}`);
       navigate(`/group/${groupId}`);
     } catch (err) {
       toast(err.message || 'Error al guardar el gasto', 'error');

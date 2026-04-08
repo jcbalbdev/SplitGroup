@@ -5,6 +5,7 @@
 
 import { useState, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
+import { X, ChevronDown } from 'lucide-react';
 
 /**
  * @param {Array}    items       - [{ key, emoji, label }]
@@ -66,7 +67,7 @@ export function FilterDropdown({ items, activeKey, onSelect, icon = '🏷️', l
         }}
       >
         {isActive && active ? <>{active.emoji} {active.label}</> : <>{icon} {label}</>}
-        <span style={{ fontSize: '0.65rem', opacity: 0.7 }}>▾</span>
+        <ChevronDown size={12} style={{ opacity: 0.7 }} />
       </button>
 
       {/* Botón limpiar */}
@@ -77,7 +78,7 @@ export function FilterDropdown({ items, activeKey, onSelect, icon = '🏷️', l
             fontSize: '0.72rem', color: 'var(--text-muted)', background: 'none',
             border: 'none', cursor: 'pointer', padding: '0 2px', alignSelf: 'center',
           }}
-        >✕</button>
+        ><X size={14} /></button>
       )}
 
       {/* Menú portal */}

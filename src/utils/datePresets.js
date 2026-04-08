@@ -10,6 +10,14 @@ export const DATE_PRESETS = [
   { key: 'custom',     label: '📅 Personalizado' },
 ];
 
+/** Formatea un Date como YYYY-MM-DD en zona local (NO UTC). */
+function fmt(d) {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
 /**
  * Calcula el rango { from, to } a partir de un preset.
  * Para 'custom' usa los parámetros customFrom / customTo.
@@ -23,15 +31,18 @@ export function getDateRange(preset, customFrom = '', customTo = '') {
   switch (preset) {
     case 'week': {
       const d = new Date(now);
-      d.setDate(d.getDate() - d.getDay());
-      return { from: d.toISOString().split('T')[0], to: now.toISOString().split('T')[0] };
+      // Lunes como inicio de semana (ISO 8601)
+      const day = d.getDay();           // 0=Dom, 1=Lun … 6=Sáb
+      const diff = (day === 0 ? 6 : day - 1);  // días desde el lunes
+      d.setDate(d.getDate() - diff);
+      return { from: fmt(d), to: fmt(now) };
     }
     case 'month':
-      return { from: new Date(y, m, 1).toISOString().split('T')[0], to: new Date(y, m + 1, 0).toISOString().split('T')[0] };
+      return { from: fmt(new Date(y, m, 1)), to: fmt(new Date(y, m + 1, 0)) };
     case 'last_month':
-      return { from: new Date(y, m - 1, 1).toISOString().split('T')[0], to: new Date(y, m, 0).toISOString().split('T')[0] };
+      return { from: fmt(new Date(y, m - 1, 1)), to: fmt(new Date(y, m, 0)) };
     case 'year':
-      return { from: new Date(y, 0, 1).toISOString().split('T')[0], to: new Date(y, 11, 31).toISOString().split('T')[0] };
+      return { from: fmt(new Date(y, 0, 1)), to: fmt(new Date(y, 11, 31)) };
     default:
       return { from: '', to: '' };
   }

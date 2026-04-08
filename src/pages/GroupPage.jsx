@@ -1,6 +1,6 @@
 // src/pages/GroupPage.jsx
 import { useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { Modal } from '../components/ui/Modal';
 import { useToast } from '../components/ui/Toast';
@@ -9,8 +9,8 @@ import { PageHeader } from '../components/ui/PageHeader';
 import { ExpenseDetailModal } from '../components/ui/ExpenseDetailModal';
 import { AvatarPickerModal } from '../components/ui/AvatarPickerModal';
 import { setGroupNickname } from '../services/api';
-import { getCategoryEmojiFromDesc, getCategoryMeta } from '../utils/categories';
-import { getCategoryOverrides } from '../utils/categoryOverrides';
+import { getCategoryEmoji } from '../utils/categories';
+import { CreditCard, Receipt, Users, Plus, BookMarked } from 'lucide-react';
 
 // Hooks de dominio
 import { useGroupData } from '../hooks/useGroupData';
@@ -22,22 +22,25 @@ import { BalanceWidget } from '../components/group/BalanceWidget';
 import { DebtList } from '../components/group/DebtList';
 import { ExpenseList } from '../components/group/ExpenseList';
 import { MemberList } from '../components/group/MemberList';
+import { BudgetList } from '../components/group/BudgetList';
 
 const TABS = [
-  { key: 'balances', label: '💳 Deudas' },
-  { key: 'expenses', label: '🧾 Gastos' },
-  { key: 'members',  label: '👥 Miembros' },
+  { key: 'balances', label: 'Deudas',       icon: CreditCard  },
+  { key: 'expenses', label: 'Gastos',       icon: Receipt     },
+  { key: 'members',  label: 'Miembros',     icon: Users       },
+  { key: 'budgets',  label: 'Presupuestos', icon: BookMarked  },
 ];
 
 export default function GroupPage() {
   const { groupId }  = useParams();
   const { user }     = useAuth();
   const navigate     = useNavigate();
+  const location     = useLocation();
   const toast        = useToast();
 
-  const [activeTab,        setActiveTab]        = useState('balances');
-  const [editingNick,      setEditingNick]       = useState(null);
-  const [savingNick,       setSavingNick]        = useState(false);
+  const [activeTab, setActiveTab] = useState(location.state?.activeTab || 'balances');
+  const [editingNick,      setEditingNick]      = useState(null);
+  const [savingNick,       setSavingNick]       = useState(false);
   const [showAvatarPicker, setShowAvatarPicker] = useState(false);
   const [avatarVersion,    setAvatarVersion]    = useState(0);
   const [selectedExpense,  setSelectedExpense]  = useState(null);
@@ -47,66 +50,39 @@ export default function GroupPage() {
     group, members, allExpenses, memberGroupsMap,
     dbNicknames, setDbNicknames,
     loading, settlements, reloadSettlements,
+    budgets, reloadBudgets,
   } = useGroupData(groupId, user?.email);
 
-  // categoryOverrides (locales, para emojis personalizados)
-  const [categoryOverrides] = useState(getCategoryOverrides);
-
-  // ── displayName usando nicknames de la BD ─────────────────────
+  // ── displayName ───────────────────────────────────────────────
   const dn = (email) => {
     if (!email) return '';
     return dbNicknames[email] || email.split('@')[0];
   };
 
-  // ── Filtros Gastos ────────────────────────────────────────────
-  const expenseFilters = useExpenseFilters(allExpenses, categoryOverrides);
+  // ── Filtros ───────────────────────────────────────────────────
+  const expenseFilters = useExpenseFilters(allExpenses);
+  const debtFilters    = useDebtFilters(allExpenses, settlements, groupId, user?.email);
 
-  // ── Filtros + Acciones Deudas ─────────────────────────────────
-  const debtFilters = useDebtFilters(allExpenses, settlements, groupId, user?.email);
-
-  // ── Helpers ───────────────────────────────────────────────────
-  const getEmojiByExpenseId = (expenseId, description, categoryFromBackend = '') => {
-    const ov = categoryOverrides[expenseId];
-    if (ov) return ov.emoji;
-    if (categoryFromBackend && categoryFromBackend !== 'otros') {
-      const found = getCategoryMeta(categoryFromBackend);
-      return found ? found.emoji : '💰';
-    }
-    return getCategoryEmojiFromDesc(description);
-  };
-
-  const getExpenseCategoryEmoji = (exp) => {
-    const ov = categoryOverrides[exp.expense_id];
-    if (ov) return ov.emoji;
-    const cat = (exp.category || '').trim();
-    if (cat && cat !== 'otros') {
-      const found = getCategoryMeta(cat);
-      return found ? found.emoji : '💰';
-    }
-    return getCategoryEmojiFromDesc(exp.description);
-  };
+  // ── Helper: emoji de categoría ────────────────────────────────
+  const getEmoji = (category, description = '') =>
+    getCategoryEmoji(category || description);
 
   const buildCatItems = (keys) => keys.map((key) => {
     if (key === 'all') return { key, emoji: '✨', label: 'Todo' };
-    if (key.startsWith('custom_')) return { key, emoji: '💰', label: key.replace('custom_', '') };
-    const meta = getCategoryMeta(key);
-    return { key, emoji: meta.emoji, label: meta.label };
+    return { key, emoji: getCategoryEmoji(key), label: key };
   });
 
-  // ── Guardar apodo en la BD ────────────────────────────────────
+  // ── Guardar apodo ─────────────────────────────────────────────
   const saveNick = async () => {
     if (!editingNick) return;
     setSavingNick(true);
     try {
       await setGroupNickname(groupId, editingNick.email, editingNick.value.trim());
-      // Actualizar mapa local sin recargar todo
       setDbNicknames((prev) => {
         const next = { ...prev };
-        if (editingNick.value.trim()) {
-          next[editingNick.email] = editingNick.value.trim();
-        } else {
-          delete next[editingNick.email];
-        }
+        editingNick.value.trim()
+          ? (next[editingNick.email] = editingNick.value.trim())
+          : delete next[editingNick.email];
         return next;
       });
       setEditingNick(null);
@@ -127,7 +103,7 @@ export default function GroupPage() {
         onBack={() => navigate('/')}
         action={
           <button id="add-expense-fab-header" className="btn btn-primary btn-sm" onClick={() => navigate(`/group/${groupId}/add-expense`)}>
-            + Gasto
+            <Plus size={14} /> Gasto
           </button>
         }
       />
@@ -146,10 +122,11 @@ export default function GroupPage() {
                 membersCount={members.length}
               />
 
-              {/* Tabs */}
               <div className="tabs" style={{ marginBottom: 12 }}>
-                {TABS.map(({ key, label }) => (
-                  <div key={key} id={`tab-${key}`} className={`tab ${activeTab === key ? 'active' : ''}`} onClick={() => setActiveTab(key)}>{label}</div>
+                {TABS.map(({ key, label, icon: Icon }) => (
+                  <div key={key} id={`tab-${key}`} className={`tab ${activeTab === key ? 'active' : ''}`} onClick={() => setActiveTab(key)}>
+                    <Icon size={15} /> {label}
+                  </div>
                 ))}
               </div>
 
@@ -170,7 +147,7 @@ export default function GroupPage() {
                   setDebtCustomTo={debtFilters.setDebtCustomTo}
                   onSettle={(id) => debtFilters.handleSettle(id, toast, reloadSettlements)}
                   onUnsettle={(id) => debtFilters.handleUnsettle(id, toast, reloadSettlements)}
-                  getEmojiByExpenseId={getEmojiByExpenseId}
+                  getEmoji={getEmoji}
                   dn={dn}
                 />
               )}
@@ -189,11 +166,11 @@ export default function GroupPage() {
                   customTo={expenseFilters.customTo}
                   setCustomTo={expenseFilters.setCustomTo}
                   onExpenseClick={setSelectedExpense}
-                  onEditExpense={(exp) => navigate(`/group/${groupId}/expense/${exp.expense_id}/edit`, { state: { usedCategoryKeys: expenseFilters.availableCategories } })}
+                  onEditExpense={(exp) => navigate(`/group/${groupId}/expense/${exp.expense_id}/edit`)}
                   onEditSession={(item) => navigate(`/group/${groupId}/session/${item.sessionId}/edit`, { state: { sessionExpenses: item.expenses, description: item.description, date: item.date, total: item.total } })}
                   pendingDebtByExpenseId={debtFilters.pendingDebtByExpenseId}
                   settlements={settlements}
-                  getExpenseCategoryEmoji={getExpenseCategoryEmoji}
+                  getEmoji={getEmoji}
                   dn={dn}
                 />
               )}
@@ -208,6 +185,15 @@ export default function GroupPage() {
                   onEditNickname={setEditingNick}
                   onAvatarClick={() => setShowAvatarPicker(true)}
                   dn={dn}
+                />
+              )}
+
+              {activeTab === 'budgets' && (
+                <BudgetList
+                  budgets={budgets}
+                  groupId={groupId}
+                  members={members}
+                  onRefresh={reloadBudgets}
                 />
               )}
             </>
@@ -240,7 +226,7 @@ export default function GroupPage() {
             <div style={{ display: 'flex', gap: 10 }}>
               {dbNicknames[editingNick.email] && (
                 <button className="btn btn-secondary" style={{ flex: 1 }}
-                  onClick={() => { setEditingNick((p) => ({ ...p, value: '' })); }}
+                  onClick={() => setEditingNick((p) => ({ ...p, value: '' }))}
                   disabled={savingNick}>
                   Quitar apodo
                 </button>

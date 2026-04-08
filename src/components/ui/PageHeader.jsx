@@ -1,6 +1,6 @@
 // src/components/ui/PageHeader.jsx
 // Header reutilizable con botón atrás, título y slot opcional de acción.
-// Usado por GroupPage, AddExpensePage, EditExpensePage y EditSessionPage.
+import { ArrowLeft } from 'lucide-react';
 
 /**
  * @param {string}    title      - Título principal
@@ -20,7 +20,7 @@ export function PageHeader({ title, subtitle, onBack, action }) {
               aria-label="Volver"
               style={{ flexShrink: 0 }}
             >
-              ←
+              <ArrowLeft size={20} />
             </button>
           )}
           <div style={{ minWidth: 0 }}>

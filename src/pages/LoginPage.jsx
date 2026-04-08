@@ -3,6 +3,7 @@ import { useState, useRef, useEffect } from 'react';
 import { sendMagicLink, verifyToken, loginWithPassword, registerUser } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../components/ui/Toast';
+import { Split, Mail, Lock, Eye, EyeOff, LogIn, UserPlus, ArrowLeft, RefreshCw, ShieldCheck, Zap, Users, Wallet, KeyRound, Hash } from 'lucide-react';
 
 // Modos: 'login' | 'register' | 'otp_email' | 'otp_code' | 'verify_email'
 export default function LoginPage() {
@@ -131,7 +132,7 @@ export default function LoginPage() {
 
   const Logo = () => (
     <div className="logo" style={{ justifyContent:'center', marginBottom:36 }}>
-      <div className="logo-icon">💸</div>
+      <div className="logo-icon"><Split size={20} /></div>
       <span className="logo-text">SplitGroup</span>
     </div>
   );
@@ -145,7 +146,7 @@ export default function LoginPage() {
         <Bg />
         <div className="container animate-slide-up" style={{ position:'relative', zIndex:1, padding:'32px 24px', textAlign:'center' }}>
           <Logo />
-          <div style={{ fontSize:'3rem', marginBottom:16 }}>📧</div>
+          <div style={{ fontSize:'3rem', marginBottom:16 }}><Mail size={48} strokeWidth={1.5} /></div>
           <h1 style={{ fontSize:'1.5rem', marginBottom:12 }}>Revisa tu correo</h1>
           <p style={{ color:'var(--text-secondary)', marginBottom:24 }}>
             Enviamos un email de confirmación a{' '}
@@ -153,7 +154,7 @@ export default function LoginPage() {
             <br />Haz clic en el enlace para activar tu cuenta.
           </p>
           <button className="btn btn-ghost btn-full" onClick={resetToLogin}>
-            ← Volver al inicio
+            <ArrowLeft size={16} /> Volver al inicio
           </button>
         </div>
       </div>
@@ -170,7 +171,7 @@ export default function LoginPage() {
         <div className="container animate-slide-up" style={{ position:'relative', zIndex:1, padding:'32px 24px' }}>
           <Logo />
           <div style={{ textAlign:'center', marginBottom:28 }}>
-            <div style={{ fontSize:'2.5rem', marginBottom:8 }}>📱</div>
+            <div style={{ fontSize:'2.5rem', marginBottom:8 }}><ShieldCheck size={42} strokeWidth={1.5} /></div>
             <h1 style={{ fontSize:'1.4rem', marginBottom:8 }}>Código enviado</h1>
             <p style={{ color:'var(--text-secondary)', fontSize:'0.9rem' }}>
               Revisa el correo de <strong style={{ color:'var(--primary-light)' }}>{email}</strong>
@@ -193,14 +194,14 @@ export default function LoginPage() {
             <button id="verify-otp-btn"
               className={`btn btn-primary btn-full ${(loading || otp.join('').length < 6) ? 'btn-disabled':''}`}
               disabled={loading || otp.join('').length < 6} onClick={() => handleVerifyOtp()}>
-              {loading ? '⚡ Verificando...' : '✅ Verificar código'}
+              {loading ? <><Zap size={14} /> Verificando...</> : <><ShieldCheck size={14} /> Verificar código</>}
             </button>
           </div>
           <div style={{ display:'flex', flexDirection:'column', alignItems:'center', gap:10 }}>
             <button className="btn btn-ghost" disabled={resendTimer > 0} onClick={handleSendOtp}>
-              {resendTimer > 0 ? `Reenviar en ${resendTimer}s` : '🔄 Reenviar código'}
+              {resendTimer > 0 ? `Reenviar en ${resendTimer}s` : <><RefreshCw size={14} /> Reenviar código</>}
             </button>
-            <button className="btn btn-ghost" onClick={resetToLogin}>← Volver</button>
+            <button className="btn btn-ghost" onClick={resetToLogin}><ArrowLeft size={14} /> Volver</button>
           </div>
         </div>
       </div>
@@ -225,7 +226,7 @@ export default function LoginPage() {
                 fontSize:'0.9rem', border:'none', cursor:'pointer', transition:'all 0.2s',
                 background: mode === m ? 'var(--primary)' : 'transparent',
                 color: mode === m ? '#fff' : 'var(--text-secondary)' }}>
-              {m === 'login' ? '🔑 Iniciar sesión' : '✨ Crear cuenta'}
+              {m === 'login' ? <><LogIn size={14} /> Iniciar sesión</> : <><UserPlus size={14} /> Crear cuenta</>}
             </button>
           ))}
         </div>
@@ -238,7 +239,7 @@ export default function LoginPage() {
             <div className="input-group">
               <label className="input-label" htmlFor="email-input">Email</label>
               <div className="input-icon-wrapper">
-                <span className="input-icon">✉</span>
+                <span className="input-icon"><Mail size={16} /></span>
                 <input id="email-input" className="input" type="email"
                   placeholder="tucorreo@ejemplo.com" value={email}
                   onChange={e => setEmail(e.target.value)} required autoFocus />
@@ -249,7 +250,7 @@ export default function LoginPage() {
             <div className="input-group">
               <label className="input-label" htmlFor="password-input">Contraseña</label>
               <div className="input-icon-wrapper" style={{ position:'relative' }}>
-                <span className="input-icon">🔒</span>
+                <span className="input-icon"><Lock size={16} /></span>
                 <input id="password-input" className="input"
                   type={showPass ? 'text' : 'password'}
                   placeholder={mode === 'register' ? 'Mínimo 6 caracteres' : 'Tu contraseña'}
@@ -258,7 +259,7 @@ export default function LoginPage() {
                   style={{ position:'absolute', right:12, top:'50%', transform:'translateY(-50%)',
                     background:'none', border:'none', cursor:'pointer',
                     color:'var(--text-secondary)', fontSize:'1rem' }}>
-                  {showPass ? '🙈' : '👁️'}
+                  {showPass ? <EyeOff size={18} /> : <Eye size={18} />}
                 </button>
               </div>
             </div>
@@ -268,7 +269,7 @@ export default function LoginPage() {
               <div className="input-group">
                 <label className="input-label" htmlFor="pass-conf-input">Confirmar contraseña</label>
                 <div className="input-icon-wrapper">
-                  <span className="input-icon">🔒</span>
+                  <span className="input-icon"><Lock size={16} /></span>
                   <input id="pass-conf-input" className="input" type="password"
                     placeholder="Repite la contraseña"
                     value={passConf} onChange={e => setPassConf(e.target.value)} required />
@@ -280,8 +281,8 @@ export default function LoginPage() {
               className={`btn btn-primary btn-full ${loading ? 'btn-disabled':''}`}
               disabled={loading}>
               {loading
-                ? '⚡ Cargando...'
-                : mode === 'login' ? '✨ Entrar' : '🚀 Crear mi cuenta'}
+                ? <><Zap size={14} /> Cargando...</>
+                : mode === 'login' ? <><LogIn size={14} /> Entrar</> : <><UserPlus size={14} /> Crear mi cuenta</>}
             </button>
           </form>
         </div>
@@ -290,19 +291,19 @@ export default function LoginPage() {
         <div style={{ textAlign:'center', marginTop:8 }}>
           <button className="btn btn-ghost" style={{ fontSize:'0.85rem', color:'var(--text-secondary)' }}
             onClick={() => { setMode('login'); handleSendOtp(); }}>
-            🔢 Entrar con código de un solo uso
+            <Hash size={14} /> Entrar con código de un solo uso
           </button>
         </div>
 
         <div style={{ display:'flex', flexDirection:'column', gap:10, marginTop:28 }}>
           {[
-            { icon:'⚡', text:'Entra con contraseña — rápido y sin emails' },
-            { icon:'👥', text:'Invita a amigos y compartan gastos' },
-            { icon:'💰', text:'Calcula quién debe cuánto automáticamente' },
+            { icon: Zap, text:'Entra con contraseña — rápido y sin emails' },
+            { icon: Users, text:'Invita a amigos y compartan gastos' },
+            { icon: Wallet, text:'Calcula quién debe cuánto automáticamente' },
           ].map(f => (
             <div key={f.text} style={{ display:'flex', alignItems:'center', gap:12,
               color:'var(--text-secondary)', fontSize:'0.85rem' }}>
-              <span style={{ fontSize:'1.1rem' }}>{f.icon}</span>
+              <f.icon size={18} style={{ flexShrink: 0 }} />
               {f.text}
             </div>
           ))}

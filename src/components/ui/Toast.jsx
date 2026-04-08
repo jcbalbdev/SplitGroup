@@ -1,5 +1,6 @@
 // src/components/ui/Toast.jsx
 import { useState, useEffect, createContext, useContext, useCallback } from 'react';
+import { CircleCheck, CircleX } from 'lucide-react';
 
 const ToastContext = createContext(null);
 
@@ -18,7 +19,7 @@ export function ToastProvider({ children }) {
       <div className="toast-container">
         {toasts.map((t) => (
           <div key={t.id} className={`toast toast-${t.type}`}>
-            <span>{t.type === 'success' ? '✅' : '❌'}</span>
+            <span>{t.type === 'success' ? <CircleCheck size={16} /> : <CircleX size={16} />}</span>
             <span>{t.message}</span>
           </div>
         ))}

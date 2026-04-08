@@ -6,8 +6,10 @@ import { getGroups, createGroup, inviteAndCreateMember, deleteGroup } from '../s
 import { Modal } from '../components/ui/Modal';
 import { useToast } from '../components/ui/Toast';
 import { SkeletonList } from '../components/ui/Skeleton';
+import { Avatar } from '../components/ui/Avatar';
 import { displayName } from '../utils/nicknames';
 import { getCached, setCached, clearCached } from '../utils/cache';
+import { LogOut, Trash2, Plus, Users, Split, X, Eye, EyeOff } from 'lucide-react';
 
 export default function DashboardPage() {
   const { user, logout } = useAuth();
@@ -106,13 +108,13 @@ export default function DashboardPage() {
       <header className="header">
         <div className="header-inner">
           <div className="logo">
-            <div className="logo-icon">💸</div>
+            <div className="logo-icon"><Split size={20} /></div>
             <span className="logo-text">SplitGroup</span>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             <span className="text-sm text-muted">{displayName(user?.email)}</span>
             <button id="logout-btn" className="btn btn-ghost btn-sm" onClick={logout} title="Cerrar sesión">
-              🚪
+              <LogOut size={18} />
             </button>
           </div>
         </div>
@@ -123,7 +125,7 @@ export default function DashboardPage() {
           {/* Saludo */}
           <div style={{ marginBottom: 20, marginTop: 8 }} className="animate-fade-in">
             <h1 style={{ fontSize: '1.4rem', marginBottom: 4 }}>
-              Hola, {displayName(user?.email)} 👋
+              Hola, {displayName(user?.email)}
             </h1>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <p className="text-sm text-muted">Tus grupos de gastos compartidos</p>
@@ -134,7 +136,7 @@ export default function DashboardPage() {
                   style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '6px 14px', fontSize: '0.82rem' }}
                   onClick={() => setShowCreateModal(true)}
                 >
-                  + Grupo
+                  <Plus size={14} /> Grupo
                 </button>
               )}
             </div>
@@ -145,7 +147,7 @@ export default function DashboardPage() {
             <SkeletonList count={3} />
           ) : groups.length === 0 ? (
             <div className="empty-state animate-fade-in">
-              <div className="empty-state-icon">🏘️</div>
+              <div className="empty-state-icon"><Users size={48} strokeWidth={1.5} /></div>
               <div className="empty-state-title">No tienes grupos aún</div>
               <div className="empty-state-text">Crea tu primer grupo para empezar a registrar gastos</div>
               <button
@@ -154,7 +156,7 @@ export default function DashboardPage() {
                 style={{ marginTop: 8 }}
                 onClick={() => setShowCreateModal(true)}
               >
-                + Crear grupo
+                <Plus size={16} /> Crear grupo
               </button>
             </div>
           ) : (
@@ -171,11 +173,32 @@ export default function DashboardPage() {
                     onKeyDown={(e) => e.key === 'Enter' && navigate(`/group/${g.group_id}`)}
                     role="button" tabIndex={0}>
                     <div style={{
-                      width: 44, height: 44, borderRadius: 12,
-                      background: 'linear-gradient(135deg, var(--primary), var(--primary-dark))',
-                      display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      fontSize: '1.2rem', flexShrink: 0,
-                    }}>👥</div>
+                      display: 'flex', alignItems: 'center', flexShrink: 0,
+                      paddingLeft: 4,
+                    }}>
+                      {(g.memberEmails || []).slice(0, 3).map((email, i) => (
+                        <div key={email} style={{
+                          marginLeft: i === 0 ? 0 : -10,
+                          zIndex: 3 - i,
+                          border: '2px solid var(--bg-card)',
+                          borderRadius: '50%',
+                          position: 'relative',
+                        }}>
+                          <Avatar email={email} size="sm" />
+                        </div>
+                      ))}
+                      {(g.memberEmails || []).length > 3 && (
+                        <div style={{
+                          marginLeft: -10, zIndex: 0,
+                          width: 28, height: 28, borderRadius: '50%',
+                          background: 'var(--primary)', border: '2px solid var(--bg-card)',
+                          display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          fontSize: '0.65rem', fontWeight: 700, color: '#fff',
+                        }}>
+                          +{g.memberEmails.length - 3}
+                        </div>
+                      )}
+                    </div>
                     <div className="list-item-content">
                       <div className="list-item-title">{g.name}</div>
                       <div className="list-item-subtitle">{g.memberCount || 0} miembros</div>
@@ -186,7 +209,7 @@ export default function DashboardPage() {
                     title="Eliminar grupo"
                     onClick={(e) => { e.stopPropagation(); setConfirmDelete({ group_id: g.group_id, name: g.name }); }}
                     style={{ color: 'var(--text-muted)', fontSize: '1rem', flexShrink: 0 }}
-                  >🗑️</button>
+                  ><Trash2 size={16} /></button>
                 </div>
               ))}
             </div>
@@ -238,7 +261,7 @@ export default function DashboardPage() {
                   {members.length > 1 && (
                     <button type="button" className="btn btn-ghost btn-icon"
                       onClick={() => removeMember(i)} aria-label="Quitar">
-                      ✕
+                      <X size={16} />
                     </button>
                   )}
                 </div>
@@ -260,7 +283,7 @@ export default function DashboardPage() {
                     style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)',
                       background: 'none', border: 'none', cursor: 'pointer',
                       color: 'var(--text-muted)', fontSize: '1rem' }}>
-                    {showPassIdx === i ? '🙈' : '👁️'}
+                    {showPassIdx === i ? <EyeOff size={18} /> : <Eye size={18} />}
                   </button>
                 </div>
               </div>
@@ -305,7 +328,7 @@ export default function DashboardPage() {
               <button id="confirm-delete-group-btn" className="btn btn-primary"
                 style={{ flex: 1, background: 'var(--error, #e53e3e)', borderColor: 'var(--error, #e53e3e)' }}
                 onClick={handleDeleteGroup} disabled={deleting}>
-                {deleting ? 'Eliminando...' : '🗑️ Eliminar'}
+                {deleting ? 'Eliminando...' : <><Trash2 size={14} /> Eliminar</>}
               </button>
             </div>
           </div>

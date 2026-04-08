@@ -369,6 +369,15 @@ p  { color: var(--text-secondary); line-height: 1.6; }
   animation: slideUp 0.3s var(--ease);
 }
 .modal.centered { border-radius: var(--radius-xl); animation: zoomIn 0.25s var(--ease); }
+.modal.fullscreen {
+  max-height: calc(100dvh - 32px);
+  overflow-y: auto;
+  border-radius: var(--radius-xl);
+  animation: slideUp 0.3s var(--ease);
+}
+.modal-overlay.fullscreen {
+  align-items: center;
+}
 .modal-header {
   display: flex;
   align-items: center;

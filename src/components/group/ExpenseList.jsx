@@ -2,7 +2,8 @@
 import { Avatar } from '../ui/Avatar';
 import { FilterDropdown } from '../ui/FilterDropdown';
 import { formatAmount, formatDate } from '../../utils/balanceCalculator';
-import { getCategoryEmojiFromDesc } from '../../utils/categories';
+import { getCategoryEmoji } from '../../utils/categories';
+import { Pencil, AlertTriangle, CircleCheck, Tag, CalendarDays } from 'lucide-react';
 
 export function ExpenseList({
   filteredGrouped,
@@ -17,7 +18,7 @@ export function ExpenseList({
   onEditSession,
   pendingDebtByExpenseId,
   settlements,
-  getExpenseCategoryEmoji,
+  getEmoji,
   dn,
 }) {
   return (
@@ -30,14 +31,14 @@ export function ExpenseList({
             items={availableCatItems}
             activeKey={filterCategory}
             onSelect={setFilterCategory}
-            icon="🏷️" label="Categoría"
+            icon={<Tag size={14} />} label="Categoría"
           />
           <FilterDropdown
             id="date-filter-btn"
             items={datePresetItems}
             activeKey={datePreset}
             onSelect={setDatePreset}
-            icon="📅" label="Fecha"
+            icon={<CalendarDays size={14} />} label="Fecha"
           />
         </div>
         {datePreset === 'custom' && (
@@ -72,7 +73,7 @@ export function ExpenseList({
                   style={{ flexDirection: 'column', alignItems: 'stretch', gap: 8, cursor: 'pointer' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                     <div style={{ width: 40, height: 40, borderRadius: 10, background: 'var(--bg-hover)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.1rem', flexShrink: 0 }}>
-                      {getExpenseCategoryEmoji(exp)}
+                      {getEmoji(exp.category, exp.description)}
                     </div>
                     <div className="list-item-content">
                       <div className="list-item-title">{exp.description || 'Sin descripción'}</div>
@@ -84,7 +85,7 @@ export function ExpenseList({
                       </div>
                       <button className="btn btn-ghost btn-icon" title="Editar gasto"
                         onClick={(e) => { e.stopPropagation(); onEditExpense(exp); }}
-                        style={{ color: 'var(--text-muted)', fontSize: '1rem', padding: '6px 8px' }}>✏️</button>
+                        style={{ color: 'var(--text-muted)', fontSize: '1rem', padding: '6px 8px' }}><Pencil size={15} /></button>
                     </div>
                   </div>
 
@@ -95,14 +96,21 @@ export function ExpenseList({
                     </span>
                     {debtInfo && (
                       <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '3px 10px', borderRadius: 'var(--radius-full)', background: 'rgba(239,68,68,0.12)', border: '1px solid rgba(239,68,68,0.25)', fontSize: '0.72rem', color: 'var(--danger)', fontWeight: 600 }}>
-                        ⚠️ {debtInfo.debts.map((d) => `${dn(d.debtor)} debe ${formatAmount(d.amount)}`).join(' · ')}
+                        <AlertTriangle size={13} /> {debtInfo.debts.map((d) => `${dn(d.debtor)} debe ${formatAmount(d.amount)}`).join(' · ')}
                       </span>
                     )}
-                    {expSettled && !debtInfo && (
-                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '3px 10px', borderRadius: 'var(--radius-full)', background: 'rgba(16,185,129,0.10)', border: '1px solid rgba(16,185,129,0.25)', fontSize: '0.72rem', color: 'var(--success)', fontWeight: 600 }}>
-                        ✅ Saldado
-                      </span>
-                    )}
+                    {expSettled && !debtInfo && (() => {
+                      const debtors = (exp.participants || []).filter(p => p.user_email !== exp.paid_by && parseFloat(p.share_amount) > 0);
+                      return debtors.length > 0 ? (
+                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '3px 10px', borderRadius: 'var(--radius-full)', background: 'rgba(16,185,129,0.10)', border: '1px solid rgba(16,185,129,0.25)', fontSize: '0.72rem', color: 'var(--success)', fontWeight: 600 }}>
+                          <CircleCheck size={13} /> {debtors.map(d => `${dn(d.user_email)} saldó ${formatAmount(d.share_amount)}`).join(' · ')}
+                        </span>
+                      ) : (
+                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '3px 10px', borderRadius: 'var(--radius-full)', background: 'rgba(16,185,129,0.10)', border: '1px solid rgba(16,185,129,0.25)', fontSize: '0.72rem', color: 'var(--success)', fontWeight: 600 }}>
+                          <CircleCheck size={13} /> Saldado
+                        </span>
+                      );
+                    })()}
                   </div>
                 </div>
               );
@@ -115,7 +123,7 @@ export function ExpenseList({
                 style={{ flexDirection: 'column', alignItems: 'stretch', gap: 8, cursor: 'pointer' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                   <div style={{ width: 40, height: 40, borderRadius: 10, background: 'var(--bg-hover)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.1rem', flexShrink: 0 }}>
-                    {getCategoryEmojiFromDesc(description)}
+                    {getCategoryEmoji(description)}
                   </div>
                   <div className="list-item-content">
                     <div className="list-item-title">{description || 'Sin descripción'}</div>
@@ -127,7 +135,7 @@ export function ExpenseList({
                     </div>
                     <button className="btn btn-ghost btn-icon" title="Editar gasto"
                       onClick={(e) => { e.stopPropagation(); onEditSession(item); }}
-                      style={{ color: 'var(--text-muted)', fontSize: '1rem', padding: '6px 8px' }}>✏️</button>
+                      style={{ color: 'var(--text-muted)', fontSize: '1rem', padding: '6px 8px' }}><Pencil size={15} /></button>
                   </div>
                 </div>
                 <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', paddingLeft: 52 }}>

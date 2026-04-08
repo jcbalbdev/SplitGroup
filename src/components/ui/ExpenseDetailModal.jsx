@@ -8,11 +8,12 @@ import { Modal } from './Modal';
 import { Avatar } from './Avatar';
 import { formatAmount } from '../../utils/balanceCalculator';
 import { displayName, getNicknames } from '../../utils/nicknames';
+import { Share2, Calendar, Loader2, Split } from 'lucide-react';
 
 function formatDateLong(dateStr) {
   if (!dateStr) return '';
   try {
-    return new Date(dateStr).toLocaleDateString('es-PE', {
+    return new Date(dateStr + 'T12:00:00').toLocaleDateString('es-PE', {
       day: 'numeric', month: 'long', year: 'numeric',
     });
   } catch {
@@ -85,14 +86,7 @@ function Receipt({ item, groupName }) {
 
       {isSingle ? (
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
-          <div style={{
-            width: 32, height: 32, borderRadius: '50%',
-            background: 'linear-gradient(135deg,#7c5cfc,#5a3ed4)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            color: '#fff', fontWeight: 700, fontSize: '0.75rem',
-          }}>
-            {dn(item.expense.paid_by).slice(0, 2).toUpperCase()}
-          </div>
+          <Avatar email={item.expense.paid_by} size="sm" />
           <div style={{ flex: 1, fontSize: '0.9rem', fontWeight: 600, color: '#1a1a2e' }}>
             {dn(item.expense.paid_by)}
           </div>
@@ -101,14 +95,7 @@ function Receipt({ item, groupName }) {
       ) : (
         item.expenses.map((sub) => (
           <div key={sub.expense_id} style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
-            <div style={{
-              width: 32, height: 32, borderRadius: '50%',
-              background: 'linear-gradient(135deg,#7c5cfc,#5a3ed4)',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              color: '#fff', fontWeight: 700, fontSize: '0.75rem',
-            }}>
-              {dn(sub.paid_by).slice(0, 2).toUpperCase()}
-            </div>
+            <Avatar email={sub.paid_by} size="sm" />
             <div style={{ flex: 1, fontSize: '0.9rem', fontWeight: 600, color: '#1a1a2e' }}>
               {dn(sub.paid_by)}
             </div>
@@ -216,7 +203,7 @@ export function ExpenseDetailModal({ isOpen, onClose, item, groupName }) {
               <div>
                 <div style={{ fontWeight: 700, fontSize: '1.05rem', color: 'var(--text-primary)' }}>{desc}</div>
                 <div className="text-xs text-muted" style={{ marginTop: 3 }}>
-                  📅 {formatDateLong(date)}
+                  <Calendar size={13} style={{ display: 'inline', verticalAlign: '-2px' }} /> {formatDateLong(date)}
                 </div>
               </div>
               <div style={{ fontWeight: 800, fontSize: '1.2rem', color: 'var(--primary)' }}>
@@ -288,10 +275,10 @@ export function ExpenseDetailModal({ isOpen, onClose, item, groupName }) {
             style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}
           >
             {sharing ? (
-              '⏳ Generando imagen...'
+              <><Loader2 size={16} className="animate-spin" /> Generando imagen...</>
             ) : (
               <>
-                <span>📤</span> Compartir como imagen
+                <Share2 size={16} /> Compartir como imagen
               </>
             )}
           </button>

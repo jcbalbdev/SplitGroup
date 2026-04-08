@@ -132,7 +132,7 @@ export function getAvatarGradient(email = '') {
 /** Formatea una fecha ISO como "06 abr" */
 export function formatDate(dateStr) {
   if (!dateStr) return '';
-  try { return new Date(dateStr).toLocaleDateString('es', { day: '2-digit', month: 'short' }); }
+  try { return new Date(dateStr + 'T12:00:00').toLocaleDateString('es', { day: '2-digit', month: 'short' }); }
   catch { return dateStr; }
 }
 

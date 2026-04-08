@@ -8,6 +8,7 @@ import GroupPage from './pages/GroupPage';
 import AddExpensePage from './pages/AddExpensePage';
 import EditExpensePage from './pages/EditExpensePage';
 import EditSessionPage from './pages/EditSessionPage';
+import AddBudgetPage from './pages/AddBudgetPage';
 
 function ProtectedRoute({ children }) {
   const { user, loading } = useAuth();
@@ -97,6 +98,10 @@ export default function App() {
             <Route
               path="/group/:groupId/session/:sessionId/edit"
               element={<ProtectedRoute><EditSessionPage /></ProtectedRoute>}
+            />
+            <Route
+              path="/group/:groupId/add-budget"
+              element={<ProtectedRoute><AddBudgetPage /></ProtectedRoute>}
             />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
