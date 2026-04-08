@@ -1,9 +1,110 @@
 // src/pages/LoginPage.jsx
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { loginWithPassword, registerUser } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../components/ui/Toast';
-import { Split, Mail, Lock, Eye, EyeOff, LogIn, UserPlus, ArrowLeft } from 'lucide-react';
+import { Modal } from '../components/ui/Modal';
+import { Split, Mail, Lock, Eye, EyeOff, LogIn, UserPlus, ArrowLeft, Download, Share } from 'lucide-react';
+
+// ── Detección de dispositivo ──
+function getDeviceInfo() {
+  const ua = navigator.userAgent || '';
+  const isIOS = /iPad|iPhone|iPod/.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  const isAndroid = /Android/i.test(ua);
+  const isChrome = /Chrome/i.test(ua) && !/Edge|Edg/i.test(ua);
+  const isEdge = /Edge|Edg/i.test(ua);
+  const isSafari = /Safari/i.test(ua) && !/Chrome/i.test(ua);
+
+  if (isIOS) return { type: 'ios', browser: isSafari ? 'safari' : 'other' };
+  if (isAndroid) return { type: 'android', browser: isChrome ? 'chrome' : 'other' };
+  return { type: 'desktop', browser: isChrome ? 'chrome' : isEdge ? 'edge' : 'other' };
+}
+
+function getDeviceTitle(device) {
+  if (device.type === 'ios') return 'Instalar en iPhone';
+  if (device.type === 'android') return 'Instalar en Android';
+  return 'Instalar en tu computadora';
+}
+
+function InstallInstructions({ device }) {
+  const stepStyle = {
+    display: 'flex', alignItems: 'flex-start', gap: 12,
+    padding: '12px 14px', borderRadius: 12,
+    background: 'rgba(0, 0, 0, 0.03)',
+  };
+  const numStyle = {
+    width: 24, height: 24, borderRadius: 8,
+    background: 'var(--text-primary)', color: '#fff',
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
+    fontSize: '0.72rem', fontWeight: 700, flexShrink: 0,
+  };
+  const textStyle = { fontSize: '0.85rem', color: 'var(--text-primary)', fontWeight: 500, lineHeight: 1.4 };
+
+  // iOS pero no Safari
+  if (device.type === 'ios' && device.browser !== 'safari') {
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+        <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', textAlign: 'center', lineHeight: 1.5 }}>
+          Para instalar SplitGroup necesitas abrir esta página en <strong>Safari</strong>.
+        </p>
+        <div style={stepStyle}><div style={numStyle}>1</div><span style={textStyle}>Copia la URL de esta página</span></div>
+        <div style={stepStyle}><div style={numStyle}>2</div><span style={textStyle}>Ábrela en Safari</span></div>
+        <div style={stepStyle}><div style={numStyle}>3</div><span style={textStyle}>Sigue las instrucciones desde ahí</span></div>
+      </div>
+    );
+  }
+
+  // iOS Safari
+  if (device.type === 'ios') {
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+        <div style={stepStyle}>
+          <div style={numStyle}>1</div>
+          <div style={textStyle}>Toca el botón de <strong>Compartir</strong> <Share size={14} style={{ display: 'inline', verticalAlign: '-2px' }} /> en la barra inferior</div>
+        </div>
+        <div style={stepStyle}><div style={numStyle}>2</div><span style={textStyle}>Selecciona <strong>"Agregar a pantalla de inicio"</strong></span></div>
+        <div style={stepStyle}><div style={numStyle}>3</div><span style={textStyle}>Toca <strong>"Agregar"</strong> para confirmar</span></div>
+      </div>
+    );
+  }
+
+  // Android pero no Chrome
+  if (device.type === 'android' && device.browser !== 'chrome') {
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+        <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', textAlign: 'center', lineHeight: 1.5 }}>
+          Para instalar SplitGroup, abre esta página en <strong>Google Chrome</strong>.
+        </p>
+        <div style={stepStyle}><div style={numStyle}>1</div><span style={textStyle}>Copia la URL de esta página</span></div>
+        <div style={stepStyle}><div style={numStyle}>2</div><span style={textStyle}>Ábrela en Chrome</span></div>
+        <div style={stepStyle}><div style={numStyle}>3</div><span style={textStyle}>Sigue las instrucciones desde ahí</span></div>
+      </div>
+    );
+  }
+
+  // Android Chrome
+  if (device.type === 'android') {
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+        <div style={stepStyle}><div style={numStyle}>1</div><div style={textStyle}>Toca el menú <strong>⋮</strong> en la esquina superior derecha</div></div>
+        <div style={stepStyle}><div style={numStyle}>2</div><span style={textStyle}>Selecciona <strong>"Agregar a pantalla de inicio"</strong></span></div>
+        <div style={stepStyle}><div style={numStyle}>3</div><span style={textStyle}>Toca <strong>"Agregar"</strong> para confirmar</span></div>
+      </div>
+    );
+  }
+
+  // Desktop
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+      <div style={stepStyle}>
+        <div style={numStyle}>1</div>
+        <div style={textStyle}>Busca el ícono de instalación <Download size={14} style={{ display: 'inline', verticalAlign: '-2px' }} /> en la barra de direcciones</div>
+      </div>
+      <div style={stepStyle}><div style={numStyle}>2</div><span style={textStyle}>Haz clic en <strong>"Instalar"</strong></span></div>
+      <div style={stepStyle}><div style={numStyle}>3</div><span style={textStyle}>La app se abrirá como aplicación independiente</span></div>
+    </div>
+  );
+}
 
 export default function LoginPage() {
   const { login } = useAuth();
@@ -16,8 +117,13 @@ export default function LoginPage() {
   const [passConf,  setPassConf]  = useState('');
   const [showPass,  setShowPass]  = useState(false);
   const [loading,   setLoading]   = useState(false);
+  const [showInstall, setShowInstall] = useState(false);
+  const [isInstalled, setIsInstalled] = useState(true); // true por defecto para evitar flash
 
-  // ── Login con contraseña ─────────────────────────────────────
+  useEffect(() => {
+    setIsInstalled(window.matchMedia('(display-mode: standalone)').matches);
+  }, []);
+
   const handleLogin = async (e) => {
     e.preventDefault();
     setLoading(true);
@@ -31,7 +137,6 @@ export default function LoginPage() {
     }
   };
 
-  // ── Registro con contraseña ──────────────────────────────────
   const handleRegister = async (e) => {
     e.preventDefault();
     if (password !== passConf) { toast('Las contraseñas no coinciden', 'error'); return; }
@@ -52,18 +157,18 @@ export default function LoginPage() {
   };
 
   const resetToLogin = () => { setMode('login'); setStep('form'); };
+  const device = getDeviceInfo();
 
-  // ── Logo ──────────────────────────────────────────────────────
+  // ── Logo ──
   const Logo = () => (
     <div style={{ display:'flex', flexDirection:'column', alignItems:'center', gap:12, marginBottom:40 }}>
       <div style={{
-        width:52, height:52, borderRadius:14,
-        background:'var(--primary)', display:'flex', alignItems:'center', justifyContent:'center',
-        boxShadow:'0 4px 16px var(--primary-glow)',
+        width:48, height:48, borderRadius:14,
+        background:'rgba(0, 0, 0, 0.04)', display:'flex', alignItems:'center', justifyContent:'center',
       }}>
-        <Split size={26} color="#fff" strokeWidth={2.5} />
+        <Split size={24} color="var(--text-primary)" strokeWidth={2.5} />
       </div>
-      <span style={{ fontSize:'1.4rem', fontWeight:800, color:'var(--text-primary)', letterSpacing:'-0.01em' }}>
+      <span style={{ fontSize:'1.3rem', fontWeight:800, color:'var(--text-primary)', letterSpacing:'-0.02em' }}>
         SplitGroup
       </span>
     </div>
@@ -77,18 +182,23 @@ export default function LoginPage() {
       <div className="page" style={{ justifyContent:'center', alignItems:'center', minHeight:'100dvh', background:'var(--bg-base)' }}>
         <div className="container animate-slide-up" style={{ padding:'32px 24px', textAlign:'center', maxWidth:400 }}>
           <Logo />
-          <div style={{ width:64, height:64, borderRadius:16, background:'var(--primary-glow)',
+          <div style={{ width:64, height:64, borderRadius:16, background:'rgba(0,0,0,0.04)',
             display:'flex', alignItems:'center', justifyContent:'center', margin:'0 auto 20px' }}>
-            <Mail size={32} color="var(--primary)" strokeWidth={1.8} />
+            <Mail size={32} color="var(--text-primary)" strokeWidth={1.8} />
           </div>
           <h1 style={{ fontSize:'1.4rem', marginBottom:8 }}>Revisa tu correo</h1>
           <p style={{ fontSize:'0.9rem', marginBottom:28 }}>
             Enviamos un email de confirmación a{' '}
-            <strong style={{ color:'var(--primary)' }}>{email}</strong>.
+            <strong>{email}</strong>.
             <br />Haz clic en el enlace para activar tu cuenta.
           </p>
-          <button className="btn btn-secondary btn-full" onClick={resetToLogin}
-            style={{ borderRadius:12, padding:'14px 20px' }}>
+          <button onClick={resetToLogin}
+            style={{
+              width: '100%', padding: '14px 20px', borderRadius: 12,
+              border: '1.5px solid rgba(0,0,0,0.08)', background: 'transparent',
+              color: 'var(--text-primary)', fontSize: '0.88rem', fontWeight: 600,
+              cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+            }}>
             <ArrowLeft size={16} /> Volver al inicio
           </button>
         </div>
@@ -106,7 +216,7 @@ export default function LoginPage() {
 
         {/* Toggle Login / Registro */}
         <div style={{
-          display:'flex', background:'var(--bg-input)', borderRadius:12,
+          display:'flex', background:'rgba(0, 0, 0, 0.04)', borderRadius:12,
           padding:4, marginBottom:32,
         }}>
           {['login','register'].map(m => (
@@ -170,10 +280,17 @@ export default function LoginPage() {
             </div>
           )}
 
-          <button id="auth-submit-btn" type="submit"
-            className={`btn btn-primary btn-full ${loading ? 'btn-disabled':''}`}
-            disabled={loading}
-            style={{ borderRadius:12, padding:'14px 20px', marginTop:4, fontSize:'0.95rem' }}>
+          <button id="auth-submit-btn" type="submit" disabled={loading}
+            style={{
+              width: '100%', padding: '14px 20px', borderRadius: 12, marginTop: 4,
+              border: 'none',
+              background: loading ? 'rgba(0,0,0,0.06)' : 'var(--text-primary)',
+              color: loading ? 'var(--text-muted)' : '#fff',
+              fontSize: '0.95rem', fontWeight: 700,
+              cursor: loading ? 'wait' : 'pointer',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+              transition: 'all 0.2s ease',
+            }}>
             {loading
               ? 'Cargando...'
               : mode === 'login'
@@ -181,7 +298,59 @@ export default function LoginPage() {
                 : <><UserPlus size={16} /> Crear mi cuenta</>}
           </button>
         </form>
+
+        {/* ── Botón instalar PWA ── */}
+        {!isInstalled && (
+          <button
+            onClick={() => setShowInstall(true)}
+            style={{
+              width: '100%', marginTop: 16, padding: '10px',
+              background: 'transparent', border: 'none',
+              color: 'var(--text-muted)', fontSize: '0.78rem', fontWeight: 500,
+              cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+              transition: 'color 0.2s ease',
+            }}
+            onMouseEnter={e => e.currentTarget.style.color = 'var(--text-secondary)'}
+            onMouseLeave={e => e.currentTarget.style.color = 'var(--text-muted)'}
+          >
+            <Download size={14} /> Instalar SplitGroup en tu dispositivo
+          </button>
+        )}
       </div>
+
+      {/* ── Modal instrucciones de instalación ── */}
+      <Modal isOpen={showInstall} onClose={() => setShowInstall(false)} centered>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          <h3 style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--text-primary)', margin: 0 }}>
+            {getDeviceTitle(device)}
+          </h3>
+
+          <div style={{ textAlign: 'center' }}>
+            <div style={{
+              width: 48, height: 48, borderRadius: 14, margin: '0 auto 8px',
+              background: 'rgba(0, 0, 0, 0.04)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+            }}>
+              <Download size={22} color="var(--text-primary)" />
+            </div>
+            <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)', margin: 0 }}>
+              Sigue estos pasos para instalar la app
+            </p>
+          </div>
+
+          <InstallInstructions device={device} />
+
+          <button onClick={() => setShowInstall(false)}
+            style={{
+              width: '100%', padding: '12px', borderRadius: 12,
+              border: '1.5px solid rgba(0,0,0,0.08)', background: 'transparent',
+              color: 'var(--text-primary)', fontSize: '0.85rem', fontWeight: 600,
+              cursor: 'pointer',
+            }}>
+            Entendido
+          </button>
+        </div>
+      </Modal>
     </div>
   );
 }
