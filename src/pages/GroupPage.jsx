@@ -9,6 +9,7 @@ import { PageHeader } from '../components/ui/PageHeader';
 import { ExpenseDetailModal } from '../components/ui/ExpenseDetailModal';
 import { AvatarPickerModal } from '../components/ui/AvatarPickerModal';
 import { setGroupNickname } from '../services/api';
+import { useNicknames } from '../context/NicknamesContext';
 import { getCategoryEmoji } from '../utils/categories';
 import { CreditCard, Receipt, Users, Plus, BookMarked } from 'lucide-react';
 
@@ -53,11 +54,7 @@ export default function GroupPage() {
     budgets, reloadBudgets,
   } = useGroupData(groupId, user?.email);
 
-  // ── displayName ───────────────────────────────────────────────
-  const dn = (email) => {
-    if (!email) return '';
-    return dbNicknames[email] || email.split('@')[0];
-  };
+  const { dn, setOneNickname } = useNicknames();
 
   // ── Filtros ───────────────────────────────────────────────────
   const expenseFilters = useExpenseFilters(allExpenses);
@@ -78,6 +75,8 @@ export default function GroupPage() {
     setSavingNick(true);
     try {
       await setGroupNickname(groupId, editingNick.email, editingNick.value.trim());
+      // Actualizar context global + estado local
+      setOneNickname(editingNick.email, editingNick.value.trim());
       setDbNicknames((prev) => {
         const next = { ...prev };
         editingNick.value.trim()

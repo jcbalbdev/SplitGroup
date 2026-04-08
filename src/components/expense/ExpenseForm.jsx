@@ -10,7 +10,7 @@ import { PayerSection } from '../shared/PayerSection';
 import { SplitSection } from '../shared/SplitSection';
 import { useSplitForm } from '../../hooks/useSplitForm';
 import { getUsedCategories } from '../../utils/categories';
-import { getNicknames, displayName } from '../../utils/nicknames';
+import { useNicknames } from '../../context/NicknamesContext';
 import { getLocalDateString } from '../../utils/localDate';
 
 export function ExpenseForm({
@@ -23,8 +23,7 @@ export function ExpenseForm({
   allowMultiPayer = false,
 }) {
   const { groupId } = useParams();
-  const nicknames = useMemo(() => getNicknames(), []);
-  const dn = (email) => displayName(email, nicknames);
+  const { dn } = useNicknames();
   const usedCategories = useMemo(() => getUsedCategories(groupId), [groupId]);
 
   // ── Estado propio del formulario ──

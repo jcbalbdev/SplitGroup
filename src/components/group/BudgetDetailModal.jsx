@@ -7,13 +7,12 @@ import { PayerSummary } from '../shared/PayerSummary';
 import { BudgetItemForm } from './BudgetItemForm';
 import { useToast } from '../ui/Toast';
 import { formatAmount } from '../../utils/balanceCalculator';
-import { displayName, getNicknames } from '../../utils/nicknames';
+import { useNicknames } from '../../context/NicknamesContext';
 import { getCategoryEmoji } from '../../utils/categories';
 import { executeItem, executeAllItems, cancelBudgetItem, deleteBudgetItem, addBudgetItem, updateBudgetItem } from '../../services/api';
 import { CircleCheck, Clock, X, Play, PlaySquare, Plus, Pencil, Trash2, ExternalLink, Calendar } from 'lucide-react';
 
-const nicknames = getNicknames();
-const dn = (email) => displayName(email, nicknames);
+
 
 const STATUS_CONFIG = {
   pending:  { icon: Clock,       color: 'var(--text-muted)', label: 'Pendiente' },
@@ -113,6 +112,7 @@ function ExecuteConfirm({ item, budgetDate, onConfirm, onCancel, loading }) {
 export function BudgetDetailModal({ budget, groupId, members, isOpen, onClose, onRefresh }) {
   const navigate = useNavigate();
   const toast    = useToast();
+  const { dn }   = useNicknames();
 
   // item_id del item cuyo confirm de fecha está abierto
   const [confirmingItem, setConfirmingItem] = useState(null);

@@ -1,6 +1,7 @@
 // src/App.jsx
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
+import { NicknamesProvider } from './context/NicknamesContext';
 import { ToastProvider } from './components/ui/Toast';
 import LoginPage from './pages/LoginPage';
 import DashboardPage from './pages/DashboardPage';
@@ -58,6 +59,7 @@ export default function App() {
     <BrowserRouter>
       <AuthProvider>
         <ToastProvider>
+          <NicknamesProvider>
           <Routes>
             <Route
               path="/login"
@@ -105,6 +107,7 @@ export default function App() {
             />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
+          </NicknamesProvider>
         </ToastProvider>
       </AuthProvider>
     </BrowserRouter>

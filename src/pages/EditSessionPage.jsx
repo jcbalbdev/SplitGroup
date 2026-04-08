@@ -9,7 +9,7 @@ import { useToast } from '../components/ui/Toast';
 import { Avatar } from '../components/ui/Avatar';
 import { formatAmount } from '../utils/balanceCalculator';
 import { Modal } from '../components/ui/Modal';
-import { getNicknames, displayName } from '../utils/nicknames';
+import { useNicknames } from '../context/NicknamesContext';
 
 function FormSkeleton() {
   return (
@@ -30,8 +30,7 @@ export default function EditSessionPage() {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
-  const [nicknames] = useState(getNicknames);
-  const dn = (email) => displayName(email, nicknames);
+  const { dn } = useNicknames();
 
   const [description, setDescription] = useState('');
   const [date, setDate] = useState('');

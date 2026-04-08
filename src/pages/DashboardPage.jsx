@@ -7,7 +7,7 @@ import { Modal } from '../components/ui/Modal';
 import { useToast } from '../components/ui/Toast';
 import { SkeletonList } from '../components/ui/Skeleton';
 import { Avatar } from '../components/ui/Avatar';
-import { displayName } from '../utils/nicknames';
+import { useNicknames } from '../context/NicknamesContext';
 import { getCached, setCached, clearCached } from '../utils/cache';
 import { LogOut, Trash2, Plus, Users, Split, X, Eye, EyeOff } from 'lucide-react';
 
@@ -15,6 +15,7 @@ export default function DashboardPage() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const toast = useToast();
+  const { dn } = useNicknames();
 
   const GROUPS_KEY = `groups_${user?.email}`;
   const rawSeed    = getCached(GROUPS_KEY)?.data;
@@ -125,7 +126,7 @@ export default function DashboardPage() {
           {/* Saludo */}
           <div style={{ marginBottom: 20, marginTop: 8 }} className="animate-fade-in">
             <h1 style={{ fontSize: '1.4rem', marginBottom: 4 }}>
-              Hola, {displayName(user?.email)}
+              Hola, {dn(user?.email)}
             </h1>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <p className="text-sm text-muted">Tus grupos de gastos compartidos</p>

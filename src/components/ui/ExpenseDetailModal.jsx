@@ -7,7 +7,7 @@ import html2canvas from 'html2canvas';
 import { Modal } from './Modal';
 import { Avatar } from './Avatar';
 import { formatAmount } from '../../utils/balanceCalculator';
-import { displayName, getNicknames } from '../../utils/nicknames';
+import { useNicknames } from '../../context/NicknamesContext';
 import { Share2, Calendar, Loader2, Split } from 'lucide-react';
 
 function formatDateLong(dateStr) {
@@ -23,8 +23,7 @@ function formatDateLong(dateStr) {
 
 // ── Recibo estético para capturar como imagen ────────────────
 function Receipt({ item, groupName }) {
-  const nicknames = getNicknames();
-  const dn = (email) => displayName(email, nicknames);
+  const { dn } = useNicknames();
 
   const isSingle  = item.type === 'single';
   const desc      = isSingle ? (item.expense.description || 'Sin descripción') : (item.description || 'Sin descripción');
@@ -139,8 +138,7 @@ export function ExpenseDetailModal({ isOpen, onClose, item, groupName }) {
 
   if (!item) return null;
 
-  const nicknames = getNicknames();
-  const dn        = (email) => displayName(email, nicknames);
+  const { dn }   = useNicknames();
   const isSingle  = item.type === 'single';
   const desc      = isSingle ? (item.expense.description || 'Sin descripción') : (item.description || 'Sin descripción');
   const date      = isSingle ? item.expense.date : item.date;

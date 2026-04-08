@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from 'react';
 import { getGroupDetails, getExpenses, getGroups, getExpenseSettlements, getBudgets } from '../services/api';
 import { useToast } from '../components/ui/Toast';
 import { getCached, setCached } from '../utils/cache';
+import { useNicknames } from '../context/NicknamesContext';
 
 function buildNicksMap(members) {
   const map = {};
@@ -13,6 +14,7 @@ function buildNicksMap(members) {
 
 export function useGroupData(groupId, userEmail) {
   const toast       = useToast();
+  const { mergeNicknames } = useNicknames();
   const fetchingRef = useRef(false); // evitar doble fetch simultáneo
 
   // ── Estado inicial desde caché (muestra al instante si existe) ──
@@ -63,6 +65,9 @@ export function useGroupData(groupId, userEmail) {
       setAllExpenses(expenses);
       setDbNicknames(nicksMap);
       setBudgets(freshBudgets);
+
+      // Sincronizar apodos al contexto global
+      mergeNicknames(nicksMap);
 
       // Settlements — fetch en paralelo junto al resto
       getExpenseSettlements(groupId)

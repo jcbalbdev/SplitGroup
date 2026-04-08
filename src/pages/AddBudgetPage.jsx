@@ -15,12 +15,11 @@ import { BudgetItemForm } from '../components/group/BudgetItemForm';
 import { useGroupData } from '../hooks/useGroupData';
 import { Plus, Trash2, CircleCheck } from 'lucide-react';
 import { formatAmount } from '../utils/balanceCalculator';
-import { getNicknames, displayName } from '../utils/nicknames';
 import { getCategoryEmoji } from '../utils/categories';
 import { PayerSummary } from '../components/shared/PayerSummary';
+import { useNicknames } from '../context/NicknamesContext';
 
-const nicks = getNicknames();
-const dn = (email) => displayName(email, nicks);
+
 
 export default function AddBudgetPage() {
   const { groupId } = useParams();
@@ -28,6 +27,7 @@ export default function AddBudgetPage() {
   const { user }    = useAuth();
   const toast       = useToast();
   const { members } = useGroupData(groupId, user?.email);
+  const { dn } = useNicknames();
   const nameRef     = useRef(null);
 
   const [name,        setName]        = useState('');

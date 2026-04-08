@@ -9,7 +9,7 @@ import { PayerSection } from '../shared/PayerSection';
 import { SplitSection } from '../shared/SplitSection';
 import { useSplitForm } from '../../hooks/useSplitForm';
 import { getUsedCategories } from '../../utils/categories';
-import { getNicknames, displayName } from '../../utils/nicknames';
+import { useNicknames } from '../../context/NicknamesContext';
 
 export function BudgetItemForm({
   groupId,
@@ -20,8 +20,7 @@ export function BudgetItemForm({
   submitting = false,
   onCancel,
 }) {
-  const nicknames = useMemo(() => getNicknames(), []);
-  const dn = (email) => displayName(email, nicknames);
+  const { dn } = useNicknames();
   const usedCategories = useMemo(() => getUsedCategories(groupId), [groupId]);
 
   // ── Estado propio ──
