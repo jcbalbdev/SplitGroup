@@ -10,7 +10,6 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { createBudget, addBudgetItem, deleteBudgetItem } from '../services/api';
 import { useToast } from '../components/ui/Toast';
-import { PageHeader } from '../components/ui/PageHeader';
 import { BudgetItemForm } from '../components/group/BudgetItemForm';
 import { useGroupData } from '../hooks/useGroupData';
 import { Plus, Trash2, CircleCheck } from 'lucide-react';
@@ -18,6 +17,7 @@ import { formatAmount } from '../utils/balanceCalculator';
 import { getCategoryEmoji } from '../utils/categories';
 import { PayerSummary } from '../components/shared/PayerSummary';
 import { useNicknames } from '../context/NicknamesContext';
+import { HelpTooltip } from '../components/ui/HelpTooltip';
 
 
 
@@ -112,7 +112,30 @@ export default function AddBudgetPage() {
 
   return (
     <div className="page">
-      <PageHeader title="Nuevo presupuesto" onBack={handleBack} />
+      <div style={{
+        padding: '16px 16px 0', maxWidth: 480, margin: '0 auto', width: '100%',
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <h1 style={{ fontSize: '1.4rem', fontWeight: 800, letterSpacing: '-0.02em' }}>Nuevo presupuesto</h1>
+          <HelpTooltip
+            text="Crea un presupuesto para una meta o evento. Agrega ítems con su costo estimado y lleva el control del total en tiempo real."
+            position="bottom"
+          />
+        </div>
+        <button
+          onClick={handleBack}
+          style={{
+            background: 'rgba(0,0,0,0.04)', border: 'none', borderRadius: 10,
+            padding: '8px 12px', cursor: 'pointer', color: 'var(--text-secondary)',
+            fontSize: '0.8rem', fontWeight: 600, transition: 'all 0.2s ease',
+          }}
+          onMouseEnter={e => e.currentTarget.style.background = 'rgba(0,0,0,0.08)'}
+          onMouseLeave={e => e.currentTarget.style.background = 'rgba(0,0,0,0.04)'}
+        >
+          ← Volver
+        </button>
+      </div>
 
       <div className="page-content">
         <div className="container" style={{ paddingBottom: 40 }}>

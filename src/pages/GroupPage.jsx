@@ -7,6 +7,7 @@ import { useToast } from '../components/ui/Toast';
 import { SkeletonList } from '../components/ui/Skeleton';
 import { ExpenseDetailModal } from '../components/ui/ExpenseDetailModal';
 import { AvatarPickerModal } from '../components/ui/AvatarPickerModal';
+import { SegmentedControl } from '../components/ui/SegmentedControl';
 import { setGroupNickname, deleteExpense, deleteExpenseSession } from '../services/api';
 import { useNicknames } from '../context/NicknamesContext';
 import { getCategoryEmoji } from '../utils/categories';
@@ -24,6 +25,9 @@ import { ExpenseList } from '../components/group/ExpenseList';
 import { MemberList } from '../components/group/MemberList';
 import { BudgetList } from '../components/group/BudgetList';
 import { RecurringExpenseList } from '../components/group/RecurringExpenseList';
+import { ExternalDebtList } from '../components/group/ExternalDebtList';
+import { ExternalDebtSummaryList } from '../components/group/ExternalDebtSummaryList';
+import { ExternalDebtDetailModal } from '../components/group/ExternalDebtDetailModal';
 
 const TABS = [
   { key: 'expenses',   label: 'Gastos',       icon: Receipt    },
@@ -44,7 +48,8 @@ export default function GroupPage() {
   const [savingNick,       setSavingNick]       = useState(false);
   const [showAvatarPicker, setShowAvatarPicker] = useState(false);
   const [avatarVersion,    setAvatarVersion]    = useState(0);
-  const [selectedExpense,  setSelectedExpense]  = useState(null);
+  const [selectedExpense,     setSelectedExpense]     = useState(null);
+  const [selectedExternalDebt,setSelectedExternalDebt] = useState(null);
 
   // ── Data ──────────────────────────────────────────────────────
   const {
@@ -53,8 +58,11 @@ export default function GroupPage() {
     loading, settlements, reloadSettlements,
     budgets, reloadBudgets,
     recurring, reloadRecurring,
+    externalDebts, reloadExternalDebts,
     reload,
   } = useGroupData(groupId, user?.email);
+
+  const isSoloGroup = !loading && members.length <= 1;
 
   const { dn, setOneNickname } = useNicknames();
 
@@ -165,8 +173,16 @@ export default function GroupPage() {
             <>
               <BalanceWidget
                 activeTab={activeTab}
-                totalPendingDebt={debtFilters.totalPendingDebt}
-                filteredPendingDebts={debtFilters.filteredPendingDebts}
+                totalPendingDebt={
+                  isSoloGroup
+                    ? externalDebts.filter(d => d.status === 'pending').reduce((s, d) => s + parseFloat(d.amount), 0)
+                    : debtFilters.totalPendingDebt
+                }
+                filteredPendingDebts={
+                  isSoloGroup
+                    ? externalDebts.filter(d => d.status === 'pending')
+                    : debtFilters.filteredPendingDebts
+                }
                 filteredTotal={expenseFilters.filteredTotal}
                 filteredGrouped={expenseFilters.filteredGrouped}
                 totalLabel={expenseFilters.totalLabel}
@@ -196,6 +212,8 @@ export default function GroupPage() {
                     cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
                     color: 'var(--text-muted)', transition: 'all 0.2s ease',
                     marginBottom: 16,
+                    // En grupo individual el tab Deudas tiene su propio botón + interno
+                    display: (isSoloGroup && activeTab === 'balances') ? 'none' : 'flex',
                   }}
                   onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--primary)'; e.currentTarget.style.color = 'var(--primary)'; }}
                   onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--text-muted)'; e.currentTarget.style.color = 'var(--text-muted)'; }}
@@ -205,49 +223,71 @@ export default function GroupPage() {
               )}
 
               {activeTab === 'balances' && (
-                <DebtList
-                  filteredExpenseDebts={debtFilters.filteredExpenseDebts}
-                  filteredPendingDebts={debtFilters.filteredPendingDebts}
-                  filteredSettledDebts={debtFilters.filteredSettledDebts}
-                  debtAvailableCatItems={buildCatItems(debtFilters.debtAvailableCats)}
-                  datePresetItems={debtFilters.DATE_PRESET_ITEMS}
-                  debtFilterCat={debtFilters.debtFilterCat}
-                  setDebtFilterCat={debtFilters.setDebtFilterCat}
-                  debtDatePreset={debtFilters.debtDatePreset}
-                  setDebtDatePreset={debtFilters.setDebtDatePreset}
-                  debtCustomFrom={debtFilters.debtCustomFrom}
-                  setDebtCustomFrom={debtFilters.setDebtCustomFrom}
-                  debtCustomTo={debtFilters.debtCustomTo}
-                  setDebtCustomTo={debtFilters.setDebtCustomTo}
-                  onSettle={(id) => debtFilters.handleSettle(id, toast, reloadSettlements)}
-                  onUnsettle={(id) => debtFilters.handleUnsettle(id, toast, reloadSettlements)}
-                  getEmoji={getEmoji}
-                  dn={dn}
-                />
+                isSoloGroup ? (
+                  <ExternalDebtList
+                    externalDebts={externalDebts}
+                    groupId={groupId}
+                    userEmail={user?.email}
+                    onRefresh={() => { reloadExternalDebts(); reload(); }}
+                  />
+                ) : (
+                  <DebtList
+                    filteredExpenseDebts={debtFilters.filteredExpenseDebts}
+                    filteredPendingDebts={debtFilters.filteredPendingDebts}
+                    filteredSettledDebts={debtFilters.filteredSettledDebts}
+                    debtAvailableCatItems={buildCatItems(debtFilters.debtAvailableCats)}
+                    datePresetItems={debtFilters.DATE_PRESET_ITEMS}
+                    debtFilterCat={debtFilters.debtFilterCat}
+                    setDebtFilterCat={debtFilters.setDebtFilterCat}
+                    debtDatePreset={debtFilters.debtDatePreset}
+                    setDebtDatePreset={debtFilters.setDebtDatePreset}
+                    debtCustomFrom={debtFilters.debtCustomFrom}
+                    setDebtCustomFrom={debtFilters.setDebtCustomFrom}
+                    debtCustomTo={debtFilters.debtCustomTo}
+                    setDebtCustomTo={debtFilters.setDebtCustomTo}
+                    onSettle={(id) => debtFilters.handleSettle(id, toast, reloadSettlements)}
+                    onUnsettle={(id) => debtFilters.handleUnsettle(id, toast, reloadSettlements)}
+                    getEmoji={getEmoji}
+                    dn={dn}
+                  />
+                )
               )}
 
               {activeTab === 'expenses' && (
-                <ExpenseList
-                  filteredGrouped={expenseFilters.filteredGrouped}
-                  availableCatItems={buildCatItems(expenseFilters.availableCategories)}
-                  datePresetItems={expenseFilters.DATE_PRESET_ITEMS}
-                  filterCategory={expenseFilters.filterCategory}
-                  setFilterCategory={expenseFilters.setFilterCategory}
-                  datePreset={expenseFilters.datePreset}
-                  setDatePreset={expenseFilters.setDatePreset}
-                  customFrom={expenseFilters.customFrom}
-                  setCustomFrom={expenseFilters.setCustomFrom}
-                  customTo={expenseFilters.customTo}
-                  setCustomTo={expenseFilters.setCustomTo}
-                  onExpenseClick={setSelectedExpense}
-                  onEditExpense={(exp) => navigate(`/group/${groupId}/expense/${exp.expense_id}/edit`)}
-                  onEditSession={(item) => navigate(`/group/${groupId}/session/${item.sessionId}/edit`, { state: { sessionExpenses: item.expenses, description: item.description, date: item.date, total: item.total } })}
-                  pendingDebtByExpenseId={debtFilters.pendingDebtByExpenseId}
-                  settlements={settlements}
-                  getEmoji={getEmoji}
-                  dn={dn}
-                />
+                <>
+                  <ExpenseList
+                    filteredGrouped={expenseFilters.filteredGrouped}
+                    availableCatItems={buildCatItems(expenseFilters.availableCategories)}
+                    datePresetItems={expenseFilters.DATE_PRESET_ITEMS}
+                    filterCategory={expenseFilters.filterCategory}
+                    setFilterCategory={expenseFilters.setFilterCategory}
+                    datePreset={expenseFilters.datePreset}
+                    setDatePreset={expenseFilters.setDatePreset}
+                    customFrom={expenseFilters.customFrom}
+                    setCustomFrom={expenseFilters.setCustomFrom}
+                    customTo={expenseFilters.customTo}
+                    setCustomTo={expenseFilters.setCustomTo}
+                    onExpenseClick={setSelectedExpense}
+                    onEditExpense={(exp) => navigate(`/group/${groupId}/expense/${exp.expense_id}/edit`)}
+                    onEditSession={(item) => navigate(`/group/${groupId}/session/${item.sessionId}/edit`, { state: { sessionExpenses: item.expenses, description: item.description, date: item.date, total: item.total } })}
+                    pendingDebtByExpenseId={debtFilters.pendingDebtByExpenseId}
+                    settlements={settlements}
+                    getEmoji={getEmoji}
+                    dn={dn}
+                  />
+
+                  {/* Préstamos — solo en grupo individual */}
+                  {isSoloGroup && (
+                    <ExternalDebtSummaryList
+                      externalDebts={externalDebts}
+                      onDebtClick={setSelectedExternalDebt}
+                    />
+                  )}
+
+                </>
               )}
+
+
 
               {activeTab === 'recurring' && (
                 <RecurringExpenseList
@@ -287,9 +327,8 @@ export default function GroupPage() {
           padding: '0 20px 12px',
           pointerEvents: 'none',
         }}>
-          <nav style={{
-            display: 'flex', gap: 4,
-            background: 'rgba(255, 255, 255, 0.95)',
+          <div style={{
+            background: 'rgba(245, 245, 247, 0.92)',
             backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)',
             borderRadius: 16,
             padding: 5,
@@ -298,26 +337,12 @@ export default function GroupPage() {
             width: '100%',
             pointerEvents: 'auto',
           }}>
-            {TABS.map(({ key, label, icon: Icon }) => {
-              const isActive = activeTab === key;
-              return (
-                <button key={key} id={`tab-${key}`}
-                  onClick={() => setActiveTab(key)}
-                  style={{
-                    flex: 1,
-                    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
-                    background: 'none', cursor: 'pointer',
-                    padding: '10px 4px', borderRadius: 12,
-                    color: isActive ? 'var(--text-primary)' : 'var(--text-muted)',
-                    border: isActive ? '1.5px solid rgba(0, 0, 0, 0.1)' : '1.5px solid transparent',
-                    transition: 'all 0.2s ease',
-                    fontSize: '0.78rem', fontWeight: isActive ? 700 : 500,
-                  }}>
-                  {label}
-                </button>
-              );
-            })}
-          </nav>
+            <SegmentedControl
+              tabs={TABS.map(t => ({ key: t.key, label: t.label }))}
+              activeKey={activeTab}
+              onChange={setActiveTab}
+            />
+          </div>
         </div>
       )}
 
@@ -387,6 +412,14 @@ export default function GroupPage() {
           </div>
         )}
       </Modal>
+
+      {/* ── Modal Resumen del préstamo ───────────────────────── */}
+      <ExternalDebtDetailModal
+        isOpen={!!selectedExternalDebt}
+        debt={selectedExternalDebt}
+        onClose={() => setSelectedExternalDebt(null)}
+        onAction={reloadExternalDebts}
+      />
     </div>
   );
 }

@@ -6,6 +6,7 @@
 import { useState, useMemo } from 'react';
 import { useParams } from 'react-router-dom';
 import { Repeat } from 'lucide-react';
+import { SegmentedControl } from '../ui/SegmentedControl';
 import { FormSkeleton } from '../ui/FormSkeleton';
 import { CategoryPicker } from '../shared/CategoryPicker';
 import { PayerSection } from '../shared/PayerSection';
@@ -26,12 +27,13 @@ export function ExpenseForm({
   loading,
   members,
   initialValues = {},
-  submitLabel = '💾 Guardar',
+  submitLabel,
   onSubmit,
   submitting,
   allowMultiPayer = false,
   allowRecurring = false,
   initialRecurring = false,
+  onRecurringChange,
 }) {
   const { groupId } = useParams();
   const { dn } = useNicknames();
@@ -136,34 +138,31 @@ export function ExpenseForm({
             <label className="input-label" htmlFor="expense-amount-input" style={{ margin: 0 }}>Monto total</label>
             {allowRecurring && (
               <div style={{
-                display: 'inline-flex', gap: 3,
+                display: 'inline-flex',
                 background: 'rgba(0, 0, 0, 0.04)', borderRadius: 10, padding: 3,
+                width: 200,
               }}>
-                {[
-                  { value: false, label: 'Único' },
-                  { value: true,  label: 'Recurrente' },
-                ].map(opt => {
-                  const active = isRecurring === opt.value;
-                  return (
-                    <button key={String(opt.value)} type="button"
-                      id={`expense-type-${opt.value ? 'recurring' : 'single'}`}
-                      onClick={() => setIsRecurring(opt.value)}
-                      style={{
-                        padding: '6px 14px', borderRadius: 8, border: 'none',
-                        background: active
-                          ? (opt.value ? 'linear-gradient(135deg, var(--primary), var(--primary-light))' : '#fff')
-                          : 'transparent',
-                        boxShadow: active ? '0 1px 4px rgba(0,0,0,0.08)' : 'none',
-                        color: active
-                          ? (opt.value ? '#fff' : 'var(--text-primary)')
-                          : 'var(--text-muted)',
-                        fontSize: '0.75rem', fontWeight: active ? 700 : 500,
-                        cursor: 'pointer', transition: 'all 0.2s ease',
-                      }}>
-                      {opt.label}
-                    </button>
-                  );
-                })}
+                <SegmentedControl
+                  size="sm"
+                  tabs={[
+                    { key: 'single', label: 'Único' },
+                    { key: 'recurring', label: 'Recurrente' },
+                  ]}
+                  activeKey={isRecurring ? 'recurring' : 'single'}
+                  onChange={(key) => {
+                    const val = key === 'recurring';
+                    setIsRecurring(val);
+                    onRecurringChange?.(val);
+                  }}
+                  pillColors={{
+                    single: '#fff',
+                    recurring: 'linear-gradient(135deg, var(--primary), var(--primary-light))',
+                  }}
+                  textColors={{
+                    single: 'var(--text-primary)',
+                    recurring: '#fff',
+                  }}
+                />
               </div>
             )}
           </div>
@@ -246,36 +245,22 @@ export function ExpenseForm({
           <div className="input-group">
             <label className="input-label" htmlFor="recurring-freq">Frecuencia</label>
             <div style={{
-              display: 'flex', gap: 4,
+              display: 'flex',
               background: 'rgba(255,255,255,0.7)',
               borderRadius: 'var(--radius-md)',
               padding: 4,
             }}>
-              {FREQ_OPTIONS.map(({ key, label }) => (
-                <button
-                  key={key}
-                  type="button"
-                  id={`freq-${key}`}
-                  onClick={() => setFrequency(key)}
-                  style={{
-                    flex: 1,
-                    padding: '8px 4px',
-                    borderRadius: 'var(--radius-sm)',
-                    fontSize: '0.78rem',
-                    fontWeight: frequency === key ? 700 : 500,
-                    color: frequency === key ? 'var(--primary)' : 'var(--text-muted)',
-                    background: frequency === key ? '#fff' : 'transparent',
-                    border: frequency === key
-                      ? '1.5px solid rgba(255,107,53,0.2)'
-                      : '1.5px solid transparent',
-                    cursor: 'pointer',
-                    transition: 'all 0.2s ease',
-                    boxShadow: frequency === key ? '0 1px 3px rgba(0,0,0,0.06)' : 'none',
-                  }}
-                >
-                  {label}
-                </button>
-              ))}
+              <SegmentedControl
+                size="sm"
+                tabs={FREQ_OPTIONS.map(f => ({ key: f.key, label: f.label }))}
+                activeKey={frequency}
+                onChange={setFrequency}
+                textColors={{
+                  weekly: 'var(--primary)',
+                  biweekly: 'var(--primary)',
+                  monthly: 'var(--primary)',
+                }}
+              />
             </div>
           </div>
 
@@ -331,7 +316,10 @@ export function ExpenseForm({
           marginBottom: 16, marginTop: 4,
         }}
       >
-        {submitting ? 'Guardando…' : 'Guardar gasto'}
+        {submitting
+          ? 'Guardando…'
+          : submitLabel ?? (isRecurring ? 'Guardar recurrente' : 'Guardar gasto')
+        }
       </button>
     </form>
   );

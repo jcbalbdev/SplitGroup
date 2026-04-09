@@ -2,7 +2,7 @@
 import { useEffect } from 'react';
 import { X } from 'lucide-react';
 
-export function Modal({ isOpen, onClose, title, children, centered = false, fullscreen = false }) {
+export function Modal({ isOpen, onClose, title, titleHelper, children, centered = false, fullscreen = false }) {
   useEffect(() => {
     if (isOpen) document.body.style.overflow = 'hidden';
     else document.body.style.overflow = '';
@@ -19,7 +19,10 @@ export function Modal({ isOpen, onClose, title, children, centered = false, full
       <div className={modalClass}>
         {title && (
           <div className="modal-header" style={fullscreen ? { position: 'sticky', top: 0, background: 'var(--bg-card)', zIndex: 1, paddingBottom: 16 } : undefined}>
-            <h3 className="modal-title">{title}</h3>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <h3 className="modal-title">{title}</h3>
+              {titleHelper}
+            </div>
             <button className="btn btn-ghost btn-icon" onClick={onClose} aria-label="Cerrar">
               <X size={18} />
             </button>

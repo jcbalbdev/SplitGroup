@@ -64,7 +64,7 @@ export const addExpense = async (payload) => {
     .insert(participantsData);
 
   check(pError, 'Error al añadir participantes');
-  return { success: true };
+  return { success: true, expense_id: expense.expense_id };
 };
 
 export const updateExpense = async (payload) => {

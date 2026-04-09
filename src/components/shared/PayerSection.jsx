@@ -2,6 +2,7 @@
 // Sección "¿Quién paga?" — rediseñado estilo iOS minimalista.
 import { Avatar } from '../ui/Avatar';
 import { SumIndicator } from './SumIndicator';
+import { SegmentedControl } from '../ui/SegmentedControl';
 
 export function PayerSection({
   members, paidBy, setPaidBy,
@@ -12,31 +13,6 @@ export function PayerSection({
   allowMultiPayer = true,
 }) {
 
-  const SegmentedControl = ({ options, value, onChange }) => (
-    <div style={{
-      display: 'inline-flex', gap: 3,
-      background: 'rgba(0, 0, 0, 0.04)', borderRadius: 10, padding: 3,
-    }}>
-      {options.map(opt => {
-        const active = value === opt.value;
-        return (
-          <button key={opt.value} type="button"
-            onClick={() => onChange(opt.value)}
-            style={{
-              padding: '6px 14px', borderRadius: 8, border: 'none',
-              background: active ? '#fff' : 'transparent',
-              boxShadow: active ? '0 1px 4px rgba(0,0,0,0.08)' : 'none',
-              color: active ? 'var(--text-primary)' : 'var(--text-muted)',
-              fontSize: '0.75rem', fontWeight: active ? 700 : 500,
-              cursor: 'pointer', transition: 'all 0.2s ease',
-            }}>
-            {opt.label}
-          </button>
-        );
-      })}
-    </div>
-  );
-
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
       {/* Header */}
@@ -45,14 +21,21 @@ export function PayerSection({
           ¿Quién paga?
         </span>
         {allowMultiPayer && (
-          <SegmentedControl
-            options={[
-              { value: false, label: 'Un pagador' },
-              { value: true, label: 'Múltiples' },
-            ]}
-            value={isMultiplePayers}
-            onChange={setIsMultiplePayers}
-          />
+          <div style={{
+            display: 'inline-flex',
+            background: 'rgba(0, 0, 0, 0.04)', borderRadius: 10, padding: 3,
+            width: 200,
+          }}>
+            <SegmentedControl
+              size="sm"
+              tabs={[
+                { key: 'single', label: 'Un pagador' },
+                { key: 'multiple', label: 'Múltiples' },
+              ]}
+              activeKey={isMultiplePayers ? 'multiple' : 'single'}
+              onChange={(key) => setIsMultiplePayers(key === 'multiple')}
+            />
+          </div>
         )}
       </div>
 

@@ -1,7 +1,7 @@
 // src/hooks/useGroupData.js
 // Stale-while-revalidate: muestra caché al instante, refresca en background sin spinner
 import { useState, useEffect, useRef } from 'react';
-import { getGroupDetails, getExpenses, getGroups, getExpenseSettlements, getBudgets, getRecurringExpenses, executeRecurringExpense } from '../services/api';
+import { getGroupDetails, getExpenses, getGroups, getExpenseSettlements, getBudgets, getRecurringExpenses, executeRecurringExpense, getExternalDebts } from '../services/api';
 import { useToast } from '../components/ui/Toast';
 import { getCached, setCached } from '../utils/cache';
 import { useNicknames } from '../context/NicknamesContext';
@@ -39,6 +39,7 @@ export function useGroupData(groupId, userEmail) {
   const [settlements,     setSettlements]     = useState(seed?.settlements || {});
   const [budgets,         setBudgets]         = useState(seed?.budgets || []);
   const [recurring,       setRecurring]       = useState(seed?.recurring || []);
+  const [externalDebts,   setExternalDebts]   = useState(seed?.externalDebts || []);
 
   const reloadSettlements = async () => {
     try {
@@ -64,21 +65,23 @@ export function useGroupData(groupId, userEmail) {
     if (showSpinner) setLoading(true);
 
     try {
-      const [detailRes, expenseRes, budgetRes, recurringRes] = await withTimeout(
+      const [detailRes, expenseRes, budgetRes, recurringRes, externalDebtsRes] = await withTimeout(
         Promise.all([
           getGroupDetails(groupId),
           getExpenses(groupId),
           getBudgets(groupId).catch(() => ({ budgets: [] })),
           getRecurringExpenses(groupId).catch(() => ({ recurring: [] })),
+          getExternalDebts(groupId).catch(() => ({ externalDebts: [] })),
         ]),
         15000
       );
 
-      const membersData  = detailRes.members || [];
-      const nicksMap     = buildNicksMap(membersData);
-      const expenses     = expenseRes.expenses || [];
-      const freshBudgets   = budgetRes.budgets || [];
-      const freshRecurring  = recurringRes.recurring || [];
+      const membersData      = detailRes.members || [];
+      const nicksMap         = buildNicksMap(membersData);
+      const expenses         = expenseRes.expenses || [];
+      const freshBudgets     = budgetRes.budgets || [];
+      const freshRecurring   = recurringRes.recurring || [];
+      const freshExtDebts    = externalDebtsRes.externalDebts || [];
 
       setGroup(detailRes.group);
       setMembers(membersData);
@@ -86,6 +89,7 @@ export function useGroupData(groupId, userEmail) {
       setDbNicknames(nicksMap);
       setBudgets(freshBudgets);
       setRecurring(freshRecurring);
+      setExternalDebts(freshExtDebts);
 
       // ── Auto-ejecutar gastos recurrentes vencidos (catch-up completo) ──
       const today = new Date().toISOString().split('T')[0];
@@ -163,6 +167,7 @@ export function useGroupData(groupId, userEmail) {
         settlements: freshSettlements,
         budgets: freshBudgets,
         recurring: freshRecurring,
+        externalDebts: freshExtDebts,
       });
 
     } catch {
@@ -194,12 +199,20 @@ export function useGroupData(groupId, userEmail) {
     } catch { /* silencioso */ }
   };
 
+  const reloadExternalDebts = async () => {
+    try {
+      const res = await withTimeout(getExternalDebts(groupId));
+      setExternalDebts(res.externalDebts || []);
+    } catch { /* silencioso */ }
+  };
+
   return {
     group, members, allExpenses, memberGroupsMap,
     dbNicknames, setDbNicknames,
     loading, settlements, reloadSettlements,
     budgets, reloadBudgets,
     recurring, reloadRecurring,
+    externalDebts, reloadExternalDebts,
     reload: () => reload({ showSpinner: false }),
   };
 }

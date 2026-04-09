@@ -4,6 +4,7 @@ import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { getGroupDetails, addExpense, addRecurringExpense } from '../services/api';
 import { useToast } from '../components/ui/Toast';
+import { HelpTooltip } from '../components/ui/HelpTooltip';
 import { ExpenseForm } from '../components/expense/ExpenseForm';
 import { formatAmount } from '../utils/balanceCalculator';
 import { saveUsedCategory } from '../utils/categories';
@@ -25,6 +26,7 @@ export default function AddExpensePage() {
   const [members,    setMembers]    = useState([]);
   const [loading,    setLoading]    = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  const [currentRecurring, setCurrentRecurring] = useState(initialRecurring);
 
   useEffect(() => {
     const load = async () => {
@@ -136,9 +138,23 @@ export default function AddExpensePage() {
         padding: '16px 16px 0', maxWidth: 480, margin: '0 auto', width: '100%',
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
       }}>
-        <h1 style={{
-          fontSize: '1.4rem', fontWeight: 800, letterSpacing: '-0.02em',
-        }}>{isDebtMode ? 'Nueva deuda' : 'Nuevo gasto'}</h1>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <h1 style={{
+            fontSize: '1.4rem', fontWeight: 800, letterSpacing: '-0.02em',
+          }}>
+            {isDebtMode ? 'Nueva deuda' : currentRecurring ? 'Nuevo recurrente' : 'Nuevo gasto'}
+          </h1>
+          <HelpTooltip
+            text={
+              isDebtMode
+                ? 'Registra una deuda directa entre personas del grupo. El monto queda pendiente hasta que alguien lo marque como saldado.'
+                : currentRecurring
+                  ? 'Define un gasto que se repite automáticamente. Elige la frecuencia y la app lo registrará solo cada vez que llegue la fecha.'
+                  : 'Ingresa el monto, quién pagó y entre quiénes se divide. Puedes repartir de forma equitativa o personalizada.'
+            }
+            position="bottom"
+          />
+        </div>
         <button
           onClick={() => navigate(`/group/${groupId}`)}
           style={{
@@ -158,12 +174,13 @@ export default function AddExpensePage() {
             loading={loading}
             members={members}
             initialValues={initialValues}
-            submitLabel={isDebtMode ? '💾 Guardar deuda' : '💾 Guardar gasto'}
+            submitLabel={isDebtMode ? 'Guardar deuda' : undefined}
             onSubmit={handleSubmit}
             submitting={submitting}
             allowMultiPayer={!isDebtMode}
             allowRecurring={!isDebtMode}
             initialRecurring={initialRecurring}
+            onRecurringChange={setCurrentRecurring}
           />
         </div>
       </div>

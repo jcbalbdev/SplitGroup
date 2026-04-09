@@ -5,6 +5,7 @@ import { useAuth } from '../context/AuthContext';
 import { useToast } from '../components/ui/Toast';
 import { Modal } from '../components/ui/Modal';
 import { Split, Mail, Lock, Eye, EyeOff, LogIn, UserPlus, ArrowLeft, Download, Share } from 'lucide-react';
+import { SegmentedControl } from '../components/ui/SegmentedControl';
 
 // ── Detección de dispositivo ──
 function getDeviceInfo() {
@@ -218,18 +219,14 @@ export default function LoginPage() {
           display:'flex', background:'rgba(0, 0, 0, 0.04)', borderRadius:12,
           padding:4, marginBottom:32,
         }}>
-          {['login','register'].map(m => (
-            <button key={m} onClick={() => { setMode(m); setStep('form'); }}
-              style={{
-                flex:1, padding:'11px 0', borderRadius:10, fontWeight:700,
-                fontSize:'0.88rem', border:'none', cursor:'pointer', transition:'all 0.2s',
-                background: mode === m ? '#fff' : 'transparent',
-                color: mode === m ? 'var(--text-primary)' : 'var(--text-muted)',
-                boxShadow: mode === m ? '0 1px 3px rgba(0,0,0,0.08)' : 'none',
-              }}>
-              {m === 'login' ? 'Iniciar sesión' : 'Crear cuenta'}
-            </button>
-          ))}
+          <SegmentedControl
+            tabs={[
+              { key: 'login', label: 'Iniciar sesión' },
+              { key: 'register', label: 'Crear cuenta' },
+            ]}
+            activeKey={mode}
+            onChange={(key) => { setMode(key); setStep('form'); }}
+          />
         </div>
 
         <form onSubmit={mode === 'login' ? handleLogin : handleRegister}

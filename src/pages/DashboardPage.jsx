@@ -12,6 +12,8 @@ import { useNicknames } from '../context/NicknamesContext';
 import { getCached, setCached, clearCached } from '../utils/cache';
 import { LogOut, Trash2, Plus, Users, User, Split, X, Eye, EyeOff, KeyRound, Pencil, Camera, Bell } from 'lucide-react';
 import { NotificationPanel } from '../components/ui/NotificationPanel';
+import { HelpTooltip } from '../components/ui/HelpTooltip';
+import { SegmentedControl } from '../components/ui/SegmentedControl';
 import { useNotifications } from '../hooks/useNotifications';
 
 export default function DashboardPage() {
@@ -454,26 +456,32 @@ export default function DashboardPage() {
             display: 'flex', maxWidth: 480, margin: '0 auto',
             background: 'rgba(0, 0, 0, 0.04)', borderRadius: 14, padding: 4,
           }}>
-            {['groups', 'members'].map(tab => (
-              <button key={tab} onClick={() => setDashTab(tab)}
-                style={{
-                  flex: 1, padding: '10px 0', border: 'none',
-                  borderRadius: 11, cursor: 'pointer', fontSize: '0.82rem',
-                  fontWeight: dashTab === tab ? 700 : 500,
-                  color: dashTab === tab ? 'var(--text-primary)' : 'var(--text-muted)',
-                  background: dashTab === tab ? '#fff' : 'transparent',
-                  boxShadow: dashTab === tab ? '0 1px 3px rgba(0,0,0,0.08)' : 'none',
-                  transition: 'all 0.2s ease',
-                }}>
-                {tab === 'groups' ? 'Grupos' : 'Miembros'}
-              </button>
-            ))}
+            <SegmentedControl
+              tabs={[
+                { key: 'groups', label: 'Grupos' },
+                { key: 'members', label: 'Miembros' },
+              ]}
+              activeKey={dashTab}
+              onChange={setDashTab}
+            />
           </div>
         </div>
       </div>
 
       {/* Modal crear grupo */}
-      <Modal isOpen={showCreateModal} onClose={() => setShowCreateModal(false)} title="Nuevo grupo" centered fullscreen>
+      <Modal
+        isOpen={showCreateModal}
+        onClose={() => setShowCreateModal(false)}
+        title="Nuevo grupo"
+        titleHelper={
+          <HelpTooltip
+            text="Un grupo reúne a las personas con las que compartes gastos. Puedes tener varios: uno para casa, otro para viajes, etc."
+            position="bottom"
+          />
+        }
+        centered
+        fullscreen
+      >
         <form onSubmit={handleCreateGroup} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
           {/* Nombre del grupo */}
           <div className="input-group">

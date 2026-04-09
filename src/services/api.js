@@ -8,3 +8,4 @@ export * from './api/expenses';
 export * from './api/settlements';
 export * from './api/budgets';
 export * from './api/recurring';
+export * from './api/externalDebts';
