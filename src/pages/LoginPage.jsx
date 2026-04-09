@@ -1,6 +1,6 @@
 // src/pages/LoginPage.jsx
 import { useState, useEffect } from 'react';
-import { loginWithPassword, registerUser, resetPassword } from '../services/api';
+import { loginWithPassword, registerUser, resetPassword, setPassword } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../components/ui/Toast';
 import { Modal } from '../components/ui/Modal';
@@ -108,7 +108,7 @@ function InstallInstructions({ device }) {
 }
 
 export default function LoginPage() {
-  const { login } = useAuth();
+  const { login, passwordRecovery, setPasswordRecovery } = useAuth();
   const toast = useToast();
 
   const [mode,      setMode]      = useState('login');
@@ -122,6 +122,10 @@ export default function LoginPage() {
   const [isInstalled, setIsInstalled] = useState(true); // true por defecto para evitar flash
   const [resetEmail, setResetEmail] = useState('');
   const [resetting,  setResetting]  = useState(false);
+  const [newPass,       setNewPass]       = useState('');
+  const [newPassConf,   setNewPassConf]   = useState('');
+  const [showNewPass,   setShowNewPass]   = useState(false);
+  const [savingNewPass, setSavingNewPass] = useState(false);
 
   useEffect(() => {
     setIsInstalled(window.matchMedia('(display-mode: standalone)').matches);
@@ -189,6 +193,93 @@ export default function LoginPage() {
       </span>
     </div>
   );
+
+  // ════════════════════════════════════════════════════════════
+  // PASO: Establecer nueva contraseña (desde link del email)
+  // ════════════════════════════════════════════════════════════
+  if (passwordRecovery) {
+    const handleSetNewPassword = async (e) => {
+      e.preventDefault();
+      if (newPass.length < 6) { toast('Mínimo 6 caracteres', 'error'); return; }
+      if (newPass !== newPassConf) { toast('Las contraseñas no coinciden', 'error'); return; }
+      setSavingNewPass(true);
+      try {
+        await setPassword(null, newPass);
+        toast('Contraseña actualizada ✅');
+        setPasswordRecovery(false);
+        setNewPass('');
+        setNewPassConf('');
+      } catch (err) {
+        toast(err.message || 'Error al actualizar contraseña', 'error');
+      } finally {
+        setSavingNewPass(false);
+      }
+    };
+
+    return (
+      <div className="page" style={{ justifyContent:'center', alignItems:'center', minHeight:'100dvh', background:'var(--bg-base)' }}>
+        <div className="container animate-slide-up" style={{ padding:'32px 24px', textAlign:'center', maxWidth:400 }}>
+          <Logo />
+          <div style={{ width:64, height:64, borderRadius:16, background:'rgba(255,149,0,0.08)',
+            display:'flex', alignItems:'center', justifyContent:'center', margin:'0 auto 20px' }}>
+            <Lock size={32} color="var(--primary)" strokeWidth={1.8} />
+          </div>
+          <h1 style={{ fontSize:'1.4rem', marginBottom:8 }}>Nueva contraseña</h1>
+          <p style={{ fontSize:'0.85rem', color:'var(--text-muted)', marginBottom:24, lineHeight:1.5 }}>
+            Escribe tu nueva contraseña para acceder a tu cuenta.
+          </p>
+          <form onSubmit={handleSetNewPassword} style={{ display:'flex', flexDirection:'column', gap:16 }}>
+            <div className="input-group">
+              <label className="input-label" htmlFor="new-pass-input">Nueva contraseña</label>
+              <div className="input-icon-wrapper" style={{ position:'relative' }}>
+                <span className="input-icon"><Lock size={16} /></span>
+                <input id="new-pass-input" className="input"
+                  type={showNewPass ? 'text' : 'password'}
+                  placeholder="Mínimo 6 caracteres"
+                  value={newPass} onChange={e => setNewPass(e.target.value)}
+                  required minLength={6} autoFocus />
+                <button type="button" onClick={() => setShowNewPass(v => !v)}
+                  style={{
+                    position:'absolute', right:12, top:'50%', transform:'translateY(-50%)',
+                    background:'none', border:'none', cursor:'pointer',
+                    color:'var(--text-muted)', padding:4,
+                  }}>
+                  {showNewPass ? <EyeOff size={18} /> : <Eye size={18} />}
+                </button>
+              </div>
+            </div>
+            <div className="input-group">
+              <label className="input-label" htmlFor="new-pass-conf-input">Confirmar contraseña</label>
+              <div className="input-icon-wrapper">
+                <span className="input-icon"><Lock size={16} /></span>
+                <input id="new-pass-conf-input" className="input" type="password"
+                  placeholder="Repite la contraseña"
+                  value={newPassConf} onChange={e => setNewPassConf(e.target.value)}
+                  required minLength={6} />
+              </div>
+              {newPassConf && newPass !== newPassConf && (
+                <span style={{ fontSize:'0.75rem', color:'var(--danger)', marginTop:4 }}>Las contraseñas no coinciden</span>
+              )}
+            </div>
+            <button type="submit"
+              disabled={savingNewPass || !newPass || newPass !== newPassConf}
+              style={{
+                width: '100%', padding: '14px 20px', borderRadius: 12,
+                border: 'none',
+                background: (savingNewPass || !newPass || newPass !== newPassConf) ? 'rgba(0,0,0,0.06)' : 'var(--text-primary)',
+                color: (savingNewPass || !newPass || newPass !== newPassConf) ? 'var(--text-muted)' : '#fff',
+                fontSize: '0.95rem', fontWeight: 700,
+                cursor: savingNewPass ? 'wait' : 'pointer',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+                transition: 'all 0.2s ease',
+              }}>
+              {savingNewPass ? 'Guardando...' : <><Lock size={16} /> Guardar contraseña</>}
+            </button>
+          </form>
+        </div>
+      </div>
+    );
+  }
 
   // ════════════════════════════════════════════════════════════
   // PASO: Confirmar email tras registro

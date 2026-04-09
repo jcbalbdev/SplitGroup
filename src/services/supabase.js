@@ -28,7 +28,7 @@ export const supabase = createClient(supabaseUrl || '', supabaseAnonKey || '', {
   auth: {
     persistSession:     true,
     autoRefreshToken:   true,
-    detectSessionInUrl: false,
+    detectSessionInUrl: true,
     flowType:           'implicit',
     // No-op lock: evita deadlocks de navigator.locks durante HMR en desarrollo
     lock: async (_name, _acquireTimeout, fn) => await fn(),

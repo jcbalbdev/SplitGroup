@@ -26,6 +26,7 @@ const getSessionSafe = (ms = 8000) =>
 export function AuthProvider({ children }) {
   const [user,    setUser]    = useState(null);
   const [loading, setLoading] = useState(true);
+  const [passwordRecovery, setPasswordRecovery] = useState(false);
 
   useEffect(() => {
     let mounted = true;
@@ -84,6 +85,10 @@ export function AuthProvider({ children }) {
         if (event === 'SIGNED_OUT') {
           setUser(null);
           setLoading(false);
+        } else if (event === 'PASSWORD_RECOVERY') {
+          // User clicked the reset password link from email
+          setPasswordRecovery(true);
+          setLoading(false);
         } else if ((event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') && session) {
           try {
             const { data: profile } = await supabase
@@ -120,7 +125,7 @@ export function AuthProvider({ children }) {
   }, []);
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, logout, setUser }}>
+    <AuthContext.Provider value={{ user, loading, login, logout, setUser, passwordRecovery, setPasswordRecovery }}>
       {children}
     </AuthContext.Provider>
   );
