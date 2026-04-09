@@ -1,7 +1,7 @@
 // src/hooks/useGroupData.js
 // Stale-while-revalidate: muestra caché al instante, refresca en background sin spinner
 import { useState, useEffect, useRef } from 'react';
-import { getGroupDetails, getExpenses, getGroups, getExpenseSettlements, getBudgets } from '../services/api';
+import { getGroupDetails, getExpenses, getGroups, getExpenseSettlements, getBudgets, getRecurringExpenses, executeRecurringExpense } from '../services/api';
 import { useToast } from '../components/ui/Toast';
 import { getCached, setCached } from '../utils/cache';
 import { useNicknames } from '../context/NicknamesContext';
@@ -38,6 +38,7 @@ export function useGroupData(groupId, userEmail) {
   const [loading,         setLoading]         = useState(!seed);          // spinner solo sin caché
   const [settlements,     setSettlements]     = useState(seed?.settlements || {});
   const [budgets,         setBudgets]         = useState(seed?.budgets || []);
+  const [recurring,       setRecurring]       = useState(seed?.recurring || []);
 
   const reloadSettlements = async () => {
     try {
@@ -63,11 +64,12 @@ export function useGroupData(groupId, userEmail) {
     if (showSpinner) setLoading(true);
 
     try {
-      const [detailRes, expenseRes, budgetRes] = await withTimeout(
+      const [detailRes, expenseRes, budgetRes, recurringRes] = await withTimeout(
         Promise.all([
           getGroupDetails(groupId),
           getExpenses(groupId),
           getBudgets(groupId).catch(() => ({ budgets: [] })),
+          getRecurringExpenses(groupId).catch(() => ({ recurring: [] })),
         ]),
         15000
       );
@@ -75,13 +77,49 @@ export function useGroupData(groupId, userEmail) {
       const membersData  = detailRes.members || [];
       const nicksMap     = buildNicksMap(membersData);
       const expenses     = expenseRes.expenses || [];
-      const freshBudgets = budgetRes.budgets || [];
+      const freshBudgets   = budgetRes.budgets || [];
+      const freshRecurring  = recurringRes.recurring || [];
 
       setGroup(detailRes.group);
       setMembers(membersData);
       setAllExpenses(expenses);
       setDbNicknames(nicksMap);
       setBudgets(freshBudgets);
+      setRecurring(freshRecurring);
+
+      // ── Auto-ejecutar gastos recurrentes vencidos (catch-up completo) ──
+      const today = new Date().toISOString().split('T')[0];
+      const overdue = freshRecurring.filter(r => r.is_active && r.next_due_date <= today);
+      if (overdue.length > 0) {
+        (async () => {
+          let totalExecuted = 0;
+          for (const rec of overdue) {
+            // Bucle: avanza período a período hasta ponerse al día
+            let currentDueDate = rec.next_due_date;
+            let currentRec = { ...rec };
+            while (currentDueDate <= today) {
+              try {
+                const result = await executeRecurringExpense(currentRec, currentDueDate);
+                totalExecuted++;
+                // Avanzar al siguiente período localmente para la próxima iteración
+                currentDueDate = result.nextDate;
+                currentRec = { ...currentRec, next_due_date: currentDueDate };
+              } catch {
+                break; // Si falla un período, salir del bucle para este recurrente
+              }
+            }
+          }
+          if (totalExecuted > 0) {
+            toast(`${totalExecuted} gasto${totalExecuted > 1 ? 's' : ''} recurrente${totalExecuted > 1 ? 's' : ''} registrado${totalExecuted > 1 ? 's' : ''} automáticamente ✅`);
+            const [expRes, recRes] = await Promise.all([
+              getExpenses(groupId).catch(() => ({ expenses: [] })),
+              getRecurringExpenses(groupId).catch(() => ({ recurring: [] })),
+            ]);
+            setAllExpenses(expRes.expenses || []);
+            setRecurring(recRes.recurring || []);
+          }
+        })();
+      }
 
       // Sincronizar apodos al contexto global
       mergeNicknames(nicksMap);
@@ -124,6 +162,7 @@ export function useGroupData(groupId, userEmail) {
         groupsMap,
         settlements: freshSettlements,
         budgets: freshBudgets,
+        recurring: freshRecurring,
       });
 
     } catch {
@@ -148,11 +187,19 @@ export function useGroupData(groupId, userEmail) {
     } catch { /* silencioso */ }
   };
 
+  const reloadRecurring = async () => {
+    try {
+      const res = await withTimeout(getRecurringExpenses(groupId));
+      setRecurring(res.recurring || []);
+    } catch { /* silencioso */ }
+  };
+
   return {
     group, members, allExpenses, memberGroupsMap,
     dbNicknames, setDbNicknames,
     loading, settlements, reloadSettlements,
     budgets, reloadBudgets,
+    recurring, reloadRecurring,
     reload: () => reload({ showSpinner: false }),
   };
 }

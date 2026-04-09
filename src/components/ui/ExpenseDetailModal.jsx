@@ -291,8 +291,22 @@ export function ExpenseDetailModal({ isOpen, onClose, item, groupName, onEdit, o
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
               <div>
                 <div style={{ fontWeight: 700, fontSize: '1.05rem', color: 'var(--text-primary)' }}>{desc}</div>
-                <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: 3 }}>
-                  <Calendar size={13} style={{ display: 'inline', verticalAlign: '-2px' }} /> {formatDateLong(date)}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 4, flexWrap: 'wrap' }}>
+                  <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                    <Calendar size={13} style={{ display: 'inline', verticalAlign: '-2px' }} /> {formatDateLong(date)}
+                  </div>
+                  {isSingle && item.expense.recurring_id && (
+                    <span style={{
+                      display: 'inline-flex', alignItems: 'center', gap: 3,
+                      padding: '2px 8px', borderRadius: 20,
+                      background: 'var(--primary-glow)',
+                      color: 'var(--primary)',
+                      fontSize: '0.68rem', fontWeight: 700,
+                      letterSpacing: '-0.01em',
+                    }}>
+                      Recurrente
+                    </span>
+                  )}
                 </div>
               </div>
               <div style={{ fontWeight: 800, fontSize: '1.2rem', color: 'var(--text-primary)' }}>

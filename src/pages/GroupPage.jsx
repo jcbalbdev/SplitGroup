@@ -1,5 +1,5 @@
 // src/pages/GroupPage.jsx
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { Modal } from '../components/ui/Modal';
@@ -10,7 +10,7 @@ import { AvatarPickerModal } from '../components/ui/AvatarPickerModal';
 import { setGroupNickname, deleteExpense, deleteExpenseSession } from '../services/api';
 import { useNicknames } from '../context/NicknamesContext';
 import { getCategoryEmoji } from '../utils/categories';
-import { CreditCard, Receipt, Users, Plus, BookMarked } from 'lucide-react';
+import { CreditCard, Receipt, Users, Plus, BookMarked, Repeat } from 'lucide-react';
 
 // Hooks de dominio
 import { useGroupData } from '../hooks/useGroupData';
@@ -23,11 +23,13 @@ import { DebtList } from '../components/group/DebtList';
 import { ExpenseList } from '../components/group/ExpenseList';
 import { MemberList } from '../components/group/MemberList';
 import { BudgetList } from '../components/group/BudgetList';
+import { RecurringExpenseList } from '../components/group/RecurringExpenseList';
 
 const TABS = [
-  { key: 'expenses', label: 'Gastos',       icon: Receipt     },
-  { key: 'budgets',  label: 'Presupuestos', icon: BookMarked  },
-  { key: 'balances', label: 'Deudas',       icon: CreditCard  },
+  { key: 'expenses',   label: 'Gastos',       icon: Receipt    },
+  { key: 'budgets',   label: 'Presupuestos', icon: BookMarked },
+  { key: 'recurring', label: 'Recurrentes',  icon: Repeat     },
+  { key: 'balances',  label: 'Deudas',       icon: CreditCard },
 ];
 
 export default function GroupPage() {
@@ -49,7 +51,9 @@ export default function GroupPage() {
     group, members, allExpenses, memberGroupsMap,
     dbNicknames, setDbNicknames,
     loading, settlements, reloadSettlements,
-    budgets, reloadBudgets, reload,
+    budgets, reloadBudgets,
+    recurring, reloadRecurring,
+    reload,
   } = useGroupData(groupId, user?.email);
 
   const { dn, setOneNickname } = useNicknames();
@@ -57,6 +61,41 @@ export default function GroupPage() {
   // ── Filtros ───────────────────────────────────────────────────
   const expenseFilters = useExpenseFilters(allExpenses);
   const debtFilters    = useDebtFilters(allExpenses, settlements, groupId, user?.email);
+
+  // ── Filtros de tab Recurrentes ───────────────────────────────────
+  const [recurringFilterId,   setRecurringFilterId]   = useState('all'); // recurring_id o 'all'
+  const [recurringDateFrom,   setRecurringDateFrom]   = useState('');
+  const [recurringDateTo,     setRecurringDateTo]     = useState('');
+
+  // Gastos generados por plantillas (tienen recurring_id)
+  const recurringGenerated = useMemo(() =>
+    allExpenses.filter(e => e.recurring_id),
+  [allExpenses]);
+
+  // Gastos filtrados por plantilla y fecha
+  const recurringFiltered = useMemo(() => {
+    let list = recurringGenerated;
+    if (recurringFilterId !== 'all') list = list.filter(e => e.recurring_id === recurringFilterId);
+    if (recurringDateFrom) list = list.filter(e => e.date >= recurringDateFrom);
+    if (recurringDateTo)   list = list.filter(e => e.date <= recurringDateTo);
+    return list;
+  }, [recurringGenerated, recurringFilterId, recurringDateFrom, recurringDateTo]);
+
+  // Stats para BalanceWidget
+  const recurringStats = useMemo(() => {
+    const total = recurringFiltered.reduce((s, e) => s + parseFloat(e.amount), 0);
+    const templateIds = [...new Set(recurringFiltered.map(e => e.recurring_id))];
+    const selectedTemplate = recurring.find(r => r.recurring_id === recurringFilterId);
+    const label = recurringFilterId === 'all'
+      ? 'Total recurrentes'
+      : (selectedTemplate?.description || 'Filtrado');
+    return {
+      total,
+      occurrences: recurringFiltered.length,
+      templateCount: templateIds.length,
+      label,
+    };
+  }, [recurringFiltered, recurringFilterId, recurring]);
 
   // ── Helper: emoji de categoría ────────────────────────────────
   const getEmoji = (category, description = '') =>
@@ -132,17 +171,24 @@ export default function GroupPage() {
                 filteredGrouped={expenseFilters.filteredGrouped}
                 totalLabel={expenseFilters.totalLabel}
                 membersCount={members.length}
+                recurringStats={recurringStats}
                 budgets={budgets}
               />
 
               {/* Botón agregar — contextual según la tab activa */}
-              {(activeTab === 'expenses' || activeTab === 'budgets') && (
+              {(activeTab === 'expenses' || activeTab === 'budgets' || activeTab === 'recurring' || activeTab === 'balances') && (
                 <button
-                  id={activeTab === 'expenses' ? 'add-expense-btn' : 'add-budget-btn-dashed'}
+                  id={
+                    activeTab === 'expenses'  ? 'add-expense-btn' :
+                    activeTab === 'budgets'   ? 'add-budget-btn-dashed' :
+                    activeTab === 'recurring' ? 'add-recurring-btn' :
+                                               'add-debt-btn'
+                  }
                   onClick={() => navigate(
-                    activeTab === 'expenses'
-                      ? `/group/${groupId}/add-expense`
-                      : `/group/${groupId}/add-budget`
+                    activeTab === 'expenses'  ? `/group/${groupId}/add-expense` :
+                    activeTab === 'budgets'   ? `/group/${groupId}/add-budget` :
+                    activeTab === 'recurring' ? `/group/${groupId}/add-expense?recurring=1` :
+                                               `/group/${groupId}/add-expense?debt=1`
                   )}
                   style={{
                     width: '100%', padding: '16px', borderRadius: 'var(--radius-md)',
@@ -200,6 +246,22 @@ export default function GroupPage() {
                   settlements={settlements}
                   getEmoji={getEmoji}
                   dn={dn}
+                />
+              )}
+
+              {activeTab === 'recurring' && (
+                <RecurringExpenseList
+                  recurring={recurring}
+                  groupId={groupId}
+                  onRefresh={() => { reload(); reloadRecurring(); }}
+                  // ― filtros ―
+                  allRecurringExpenses={recurringGenerated}
+                  filterById={recurringFilterId}
+                  setFilterById={setRecurringFilterId}
+                  dateFrom={recurringDateFrom}
+                  setDateFrom={setRecurringDateFrom}
+                  dateTo={recurringDateTo}
+                  setDateTo={setRecurringDateTo}
                 />
               )}
 

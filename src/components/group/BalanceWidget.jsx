@@ -1,7 +1,7 @@
 // src/components/group/BalanceWidget.jsx
 import { formatAmount } from '../../utils/balanceCalculator';
 
-export function BalanceWidget({ activeTab, totalPendingDebt, filteredPendingDebts, filteredTotal, filteredGrouped, totalLabel, membersCount, budgets = [] }) {
+export function BalanceWidget({ activeTab, totalPendingDebt, filteredPendingDebts, filteredTotal, filteredGrouped, totalLabel, membersCount, budgets = [], recurringStats = null }) {
 
   const activeBudgets = budgets.filter(b => b.status === 'active');
   const budgetTotal = activeBudgets.reduce((sum, b) => {
@@ -75,6 +75,22 @@ export function BalanceWidget({ activeTab, totalPendingDebt, filteredPendingDebt
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
             <TagPill>Total general</TagPill>
             <TagPill>{activeBudgets.length} {activeBudgets.length === 1 ? 'presupuesto activo' : 'presupuestos activos'}</TagPill>
+          </div>
+        </>
+      )}
+      {activeTab === 'recurring' && recurringStats && (
+        <>
+          <div style={{
+            fontWeight: 900, fontSize: 'clamp(2.5rem, 12vw, 4rem)',
+            letterSpacing: '-0.04em', lineHeight: 1, marginBottom: 12,
+            color: recurringStats.total > 0 ? 'var(--primary)' : 'var(--text-muted)',
+          }}>{formatAmount(recurringStats.total)}</div>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            <TagPill>{recurringStats.label}</TagPill>
+            <TagPill>{recurringStats.occurrences} {recurringStats.occurrences === 1 ? 'registro' : 'registros'}</TagPill>
+            {recurringStats.templateCount > 1 && (
+              <TagPill>{recurringStats.templateCount} plantillas</TagPill>
+            )}
           </div>
         </>
       )}

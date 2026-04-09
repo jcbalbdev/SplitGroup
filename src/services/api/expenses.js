@@ -25,6 +25,7 @@ export const getExpenses = async (groupId) => {
       description:  exp.description,
       category:     exp.category,
       session_id:   exp.session_id,
+      recurring_id: exp.recurring_id ?? null,
       created_at:   exp.created_at,
       participants: exp.expense_participants.map(p => ({
         user_email:   p.user_email,
@@ -45,6 +46,7 @@ export const addExpense = async (payload) => {
       description: payload.description,
       category:    payload.category || 'otros',
       session_id:  payload.session_id || '',
+      created_by:  payload.created_by || null,
     }])
     .select()
     .single();

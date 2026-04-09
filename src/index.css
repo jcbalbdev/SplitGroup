@@ -661,3 +661,15 @@ input[type="number"] {
   -moz-appearance: textfield;
   appearance: textfield;
 }
+
+/* ─── Notification Panel — responsive ───────────────────── */
+.notification-panel {
+  width: 100% !important;
+  max-width: 100% !important;
+}
+@media (min-width: 640px) {
+  .notification-panel {
+    width: 88% !important;
+    max-width: 390px !important;
+  }
+}

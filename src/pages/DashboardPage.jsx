@@ -10,7 +10,9 @@ import { Avatar } from '../components/ui/Avatar';
 import { AvatarPickerModal } from '../components/ui/AvatarPickerModal';
 import { useNicknames } from '../context/NicknamesContext';
 import { getCached, setCached, clearCached } from '../utils/cache';
-import { LogOut, Trash2, Plus, Users, User, Split, X, Eye, EyeOff, KeyRound, Pencil, Camera } from 'lucide-react';
+import { LogOut, Trash2, Plus, Users, User, Split, X, Eye, EyeOff, KeyRound, Pencil, Camera, Bell } from 'lucide-react';
+import { NotificationPanel } from '../components/ui/NotificationPanel';
+import { useNotifications } from '../hooks/useNotifications';
 
 export default function DashboardPage() {
   const { user, logout } = useAuth();
@@ -47,6 +49,14 @@ export default function DashboardPage() {
   // Avatar picker
   const [showAvatarPicker, setShowAvatarPicker] = useState(false);
   const [avatarVersion,    setAvatarVersion]    = useState(0);
+  // Notificaciones
+  const [showNotifications, setShowNotifications] = useState(false);
+  const { activity, myRecurring, loading: notifLoading, loaded: notifLoaded, fetch: fetchNotifications } = useNotifications(user?.email);
+
+  // Contar no-vistas: actividad de hoy o recurrentes vencidos
+  const today = new Date().toISOString().split('T')[0];
+  const overdueCount = notifLoaded ? myRecurring.filter(r => r.next_due_date <= today).length : 0;
+  const unreadCount = notifLoaded ? (activity.length > 0 ? activity.length : 0) + overdueCount : 0;
 
   useEffect(() => {
     loadGroups();
@@ -144,6 +154,29 @@ export default function DashboardPage() {
             <span className="logo-text">SplitGroup</span>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            {/* Notificaciones */}
+            <button
+              id="notifications-btn"
+              onClick={() => { setShowNotifications(true); fetchNotifications(); }}
+              title="Notificaciones"
+              style={{
+                background: 'none', border: 'none', cursor: 'pointer',
+                padding: 6, borderRadius: 8, color: 'var(--text-muted)',
+                transition: 'all 0.2s ease', position: 'relative',
+              }}
+              onMouseEnter={e => { e.currentTarget.style.color = 'var(--text-primary)'; e.currentTarget.style.background = 'rgba(0,0,0,0.04)'; }}
+              onMouseLeave={e => { e.currentTarget.style.color = 'var(--text-muted)'; e.currentTarget.style.background = 'none'; }}
+            >
+              <Bell size={17} />
+              {unreadCount > 0 && (
+                <span style={{
+                  position: 'absolute', top: 2, right: 2,
+                  width: 8, height: 8, borderRadius: '50%',
+                  background: 'var(--primary)',
+                  border: '1.5px solid var(--bg-primary)',
+                }} />
+              )}
+            </button>
             <button onClick={() => setShowPasswordModal(true)} title="Cambiar contraseña"
               style={{
                 background: 'none', border: 'none', cursor: 'pointer',
@@ -716,6 +749,20 @@ export default function DashboardPage() {
           </div>
         )}
       </Modal>
+      {/* Notificaciones */}
+      <NotificationPanel
+        isOpen={showNotifications}
+        onClose={() => setShowNotifications(false)}
+        activity={activity}
+        myRecurring={myRecurring}
+        loading={notifLoading}
+        loaded={notifLoaded}
+        onRefresh={fetchNotifications}
+        onNavigate={(groupId) => {
+          setShowNotifications(false);
+          if (groupId) navigate(`/group/${groupId}`);
+        }}
+      />
     </div>
   );
 }
