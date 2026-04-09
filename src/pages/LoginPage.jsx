@@ -1,6 +1,6 @@
 // src/pages/LoginPage.jsx
 import { useState, useEffect } from 'react';
-import { loginWithPassword, registerUser } from '../services/api';
+import { loginWithPassword, registerUser, resetPassword } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../components/ui/Toast';
 import { Modal } from '../components/ui/Modal';
@@ -120,6 +120,8 @@ export default function LoginPage() {
   const [loading,   setLoading]   = useState(false);
   const [showInstall, setShowInstall] = useState(false);
   const [isInstalled, setIsInstalled] = useState(true); // true por defecto para evitar flash
+  const [resetEmail, setResetEmail] = useState('');
+  const [resetting,  setResetting]  = useState(false);
 
   useEffect(() => {
     setIsInstalled(window.matchMedia('(display-mode: standalone)').matches);
@@ -157,8 +159,22 @@ export default function LoginPage() {
     }
   };
 
-  const resetToLogin = () => { setMode('login'); setStep('form'); };
+  const resetToLogin = () => { setMode('login'); setStep('form'); setResetEmail(''); };
   const device = getDeviceInfo();
+
+  const handleResetPassword = async (e) => {
+    e.preventDefault();
+    if (!resetEmail.trim()) return;
+    setResetting(true);
+    try {
+      await resetPassword(resetEmail.trim().toLowerCase());
+      setStep('reset_sent');
+    } catch (err) {
+      toast(err.message || 'Error al enviar el correo', 'error');
+    } finally {
+      setResetting(false);
+    }
+  };
 
   // ── Logo ──
   const Logo = () => (
@@ -200,6 +216,92 @@ export default function LoginPage() {
               cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
             }}>
             <ArrowLeft size={16} /> Volver al inicio
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // ════════════════════════════════════════════════════════════
+  // PASO: Formulario de recuperar contraseña
+  // ════════════════════════════════════════════════════════════
+  if (step === 'forgot_password') {
+    return (
+      <div className="page" style={{ justifyContent:'center', alignItems:'center', minHeight:'100dvh', background:'var(--bg-base)' }}>
+        <div className="container animate-slide-up" style={{ padding:'32px 24px', textAlign:'center', maxWidth:400 }}>
+          <Logo />
+          <div style={{ width:64, height:64, borderRadius:16, background:'rgba(0,0,0,0.04)',
+            display:'flex', alignItems:'center', justifyContent:'center', margin:'0 auto 20px' }}>
+            <Lock size={32} color="var(--text-primary)" strokeWidth={1.8} />
+          </div>
+          <h1 style={{ fontSize:'1.4rem', marginBottom:8 }}>Recuperar contraseña</h1>
+          <p style={{ fontSize:'0.85rem', color:'var(--text-muted)', marginBottom:24, lineHeight:1.5 }}>
+            Ingresa tu email y te enviaremos un enlace para restablecer tu contraseña.
+          </p>
+          <form onSubmit={handleResetPassword} style={{ display:'flex', flexDirection:'column', gap:16 }}>
+            <div className="input-group">
+              <label className="input-label" htmlFor="reset-email-input">Email</label>
+              <div className="input-icon-wrapper">
+                <span className="input-icon"><Mail size={16} /></span>
+                <input id="reset-email-input" className="input" type="email"
+                  placeholder="tucorreo@ejemplo.com" value={resetEmail}
+                  onChange={e => setResetEmail(e.target.value)} required autoFocus />
+              </div>
+            </div>
+            <button type="submit" disabled={resetting}
+              style={{
+                width: '100%', padding: '14px 20px', borderRadius: 12,
+                border: 'none',
+                background: resetting ? 'rgba(0,0,0,0.06)' : 'var(--text-primary)',
+                color: resetting ? 'var(--text-muted)' : '#fff',
+                fontSize: '0.95rem', fontWeight: 700,
+                cursor: resetting ? 'wait' : 'pointer',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+                transition: 'all 0.2s ease',
+              }}>
+              {resetting ? 'Enviando...' : <><Mail size={16} /> Enviar enlace</>}
+            </button>
+          </form>
+          <button onClick={resetToLogin}
+            style={{
+              width: '100%', marginTop: 12, padding: '12px 20px', borderRadius: 12,
+              border: '1.5px solid rgba(0,0,0,0.08)', background: 'transparent',
+              color: 'var(--text-primary)', fontSize: '0.88rem', fontWeight: 600,
+              cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+            }}>
+            <ArrowLeft size={16} /> Volver al inicio
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // ════════════════════════════════════════════════════════════
+  // PASO: Confirmación de email de recuperación enviado
+  // ════════════════════════════════════════════════════════════
+  if (step === 'reset_sent') {
+    return (
+      <div className="page" style={{ justifyContent:'center', alignItems:'center', minHeight:'100dvh', background:'var(--bg-base)' }}>
+        <div className="container animate-slide-up" style={{ padding:'32px 24px', textAlign:'center', maxWidth:400 }}>
+          <Logo />
+          <div style={{ width:64, height:64, borderRadius:16, background:'rgba(52,199,89,0.08)',
+            display:'flex', alignItems:'center', justifyContent:'center', margin:'0 auto 20px' }}>
+            <Mail size={32} color="var(--success, #34c759)" strokeWidth={1.8} />
+          </div>
+          <h1 style={{ fontSize:'1.4rem', marginBottom:8 }}>¡Correo enviado!</h1>
+          <p style={{ fontSize:'0.85rem', color:'var(--text-muted)', marginBottom:28, lineHeight:1.5 }}>
+            Enviamos un enlace de recuperación a{' '}
+            <strong style={{ color:'var(--text-primary)' }}>{resetEmail}</strong>.
+            <br />Revisa tu bandeja de entrada (y spam) y haz clic en el enlace para crear una nueva contraseña.
+          </p>
+          <button onClick={resetToLogin}
+            style={{
+              width: '100%', padding: '14px 20px', borderRadius: 12,
+              border: 'none', background: 'var(--text-primary)', color: '#fff',
+              fontSize: '0.88rem', fontWeight: 700,
+              cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+            }}>
+            <ArrowLeft size={16} /> Volver a iniciar sesión
           </button>
         </div>
       </div>
@@ -293,6 +395,25 @@ export default function LoginPage() {
                 ? <><LogIn size={16} /> Entrar</>
                 : <><UserPlus size={16} /> Crear mi cuenta</>}
           </button>
+
+          {/* ── ¿Olvidaste tu contraseña? ── */}
+          {mode === 'login' && (
+            <button
+              type="button"
+              onClick={() => { setStep('forgot_password'); setResetEmail(email); }}
+              style={{
+                width: '100%', marginTop: 8, padding: '8px',
+                background: 'transparent', border: 'none',
+                color: 'var(--text-muted)', fontSize: '0.78rem', fontWeight: 500,
+                cursor: 'pointer', textAlign: 'center',
+                transition: 'color 0.2s ease',
+              }}
+              onMouseEnter={e => e.currentTarget.style.color = 'var(--text-secondary)'}
+              onMouseLeave={e => e.currentTarget.style.color = 'var(--text-muted)'}
+            >
+              ¿Olvidaste tu contraseña?
+            </button>
+          )}
         </form>
 
         {/* ── Botón instalar PWA ── */}

@@ -38,6 +38,14 @@ export const setPassword = async (email, newPassword) => {
   return { success: true };
 };
 
+export const resetPassword = async (email) => {
+  const { error } = await supabase.auth.resetPasswordForEmail(email, {
+    redirectTo: `${window.location.origin}/login`,
+  });
+  check(error, 'Error al enviar el correo de recuperación');
+  return { success: true };
+};
+
 export const changePassword = async (email, currentPassword, newPassword) => {
   // Verificar contraseña actual sin cerrar sesión (signInWithPassword no hace signOut)
   const { error: verifyError } = await supabase.auth.signInWithPassword({
