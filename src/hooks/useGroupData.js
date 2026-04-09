@@ -12,6 +12,14 @@ function buildNicksMap(members) {
   return map;
 }
 
+// Wrapper: timeout de seguridad para cualquier promise (15s por defecto)
+function withTimeout(promise, ms = 15000) {
+  return Promise.race([
+    promise,
+    new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout')), ms)),
+  ]);
+}
+
 export function useGroupData(groupId, userEmail) {
   const toast       = useToast();
   const { mergeNicknames } = useNicknames();
@@ -33,7 +41,7 @@ export function useGroupData(groupId, userEmail) {
 
   const reloadSettlements = async () => {
     try {
-      const res = await getExpenseSettlements(groupId);
+      const res = await withTimeout(getExpenseSettlements(groupId));
       const fresh = res.settlements || {};
       setSettlements(fresh);
       return fresh;   // ← retorna para que el caller pueda guardar en caché
@@ -42,18 +50,27 @@ export function useGroupData(groupId, userEmail) {
 
   // Fetch principal (silencioso si ya hay caché)
   const reload = async (opts = {}) => {
+    // Guard contra doble fetch, pero con timeout de seguridad
     if (fetchingRef.current) return;
     fetchingRef.current = true;
+
+    // Safety: forzar reset del guard después de 20s por si algo cuelga
+    const safetyTimer = setTimeout(() => {
+      fetchingRef.current = false;
+    }, 20000);
 
     const showSpinner = opts.showSpinner ?? false;
     if (showSpinner) setLoading(true);
 
     try {
-      const [detailRes, expenseRes, budgetRes] = await Promise.all([
-        getGroupDetails(groupId),
-        getExpenses(groupId),
-        getBudgets(groupId).catch(() => ({ budgets: [] })),
-      ]);
+      const [detailRes, expenseRes, budgetRes] = await withTimeout(
+        Promise.all([
+          getGroupDetails(groupId),
+          getExpenses(groupId),
+          getBudgets(groupId).catch(() => ({ budgets: [] })),
+        ]),
+        15000
+      );
 
       const membersData  = detailRes.members || [];
       const nicksMap     = buildNicksMap(membersData);
@@ -69,31 +86,22 @@ export function useGroupData(groupId, userEmail) {
       // Sincronizar apodos al contexto global
       mergeNicknames(nicksMap);
 
-      // Settlements — fetch en paralelo junto al resto
-      getExpenseSettlements(groupId)
-        .then((res) => {
-          const settled = res.settlements || {};
-          setSettlements(settled);
-          // Actualizar caché con settlements frescos
-          setCached(cacheKey, {
-            group: detailRes.group,
-            members: membersData,
-            expenses,
-            nicknames: nicksMap,
-            groupsMap: {},     // se sobrescribe abajo si hay grupos en común
-            settlements: settled,
-          });
-        })
-        .catch(() => {});
+      // Settlements — fetch en paralelo (no bloquea UI)
+      let freshSettlements = settlements;
+      try {
+        const settRes = await withTimeout(getExpenseSettlements(groupId));
+        freshSettlements = settRes.settlements || {};
+        setSettlements(freshSettlements);
+      } catch { /* silencioso */ }
 
-      // Badges grupos en común
+      // Badges grupos en común (no bloquea tampoco)
       let groupsMap = {};
       try {
-        const groupsRes   = await getGroups(userEmail);
+        const groupsRes   = await withTimeout(getGroups(userEmail));
         const allGroups   = groupsRes?.groups || [];
         const otherGroups = allGroups.filter((g) => g.group_id !== groupId);
-        const detailsArr  = await Promise.all(
-          otherGroups.map((g) => getGroupDetails(g.group_id).catch(() => null))
+        const detailsArr  = await withTimeout(
+          Promise.all(otherGroups.map((g) => getGroupDetails(g.group_id).catch(() => null)))
         );
         detailsArr.forEach((detail, i) => {
           if (!detail) return;
@@ -107,23 +115,23 @@ export function useGroupData(groupId, userEmail) {
         setMemberGroupsMap(groupsMap);
       } catch { /* silencioso */ }
 
-      // Guardar en caché para próxima visita (con settlements y budgets)
+      // Guardar en caché con datos frescos
       setCached(cacheKey, {
         group: detailRes.group,
         members: membersData,
         expenses,
         nicknames: nicksMap,
         groupsMap,
-        settlements, // valor actual del state (puede ser {} si aún no cargó)
+        settlements: freshSettlements,
         budgets: freshBudgets,
       });
 
     } catch {
       if (showSpinner) toast('Error cargando el grupo', 'error');
     } finally {
+      clearTimeout(safetyTimer);
       fetchingRef.current = false;
-      if (showSpinner) setLoading(false);
-      else setLoading(false); // siempre quitar spinner
+      setLoading(false);
     }
   };
 
@@ -135,7 +143,7 @@ export function useGroupData(groupId, userEmail) {
 
   const reloadBudgets = async () => {
     try {
-      const res = await getBudgets(groupId);
+      const res = await withTimeout(getBudgets(groupId));
       setBudgets(res.budgets || []);
     } catch { /* silencioso */ }
   };

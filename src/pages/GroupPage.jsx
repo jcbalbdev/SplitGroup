@@ -28,7 +28,6 @@ const TABS = [
   { key: 'expenses', label: 'Gastos',       icon: Receipt     },
   { key: 'budgets',  label: 'Presupuestos', icon: BookMarked  },
   { key: 'balances', label: 'Deudas',       icon: CreditCard  },
-  { key: 'members',  label: 'Miembros',     icon: Users       },
 ];
 
 export default function GroupPage() {
@@ -200,19 +199,6 @@ export default function GroupPage() {
                   pendingDebtByExpenseId={debtFilters.pendingDebtByExpenseId}
                   settlements={settlements}
                   getEmoji={getEmoji}
-                  dn={dn}
-                />
-              )}
-
-              {activeTab === 'members' && (
-                <MemberList
-                  members={members}
-                  memberGroupsMap={memberGroupsMap}
-                  nicknames={dbNicknames}
-                  currentUserEmail={user?.email}
-                  avatarVersion={avatarVersion}
-                  onEditNickname={setEditingNick}
-                  onAvatarClick={() => setShowAvatarPicker(true)}
                   dn={dn}
                 />
               )}

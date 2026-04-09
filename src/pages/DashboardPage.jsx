@@ -2,20 +2,21 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { getGroups, createGroup, inviteAndCreateMember, deleteGroup, changePassword } from '../services/api';
+import { getGroups, createGroup, inviteAndCreateMember, deleteGroup, changePassword, setGroupNickname } from '../services/api';
 import { Modal } from '../components/ui/Modal';
 import { useToast } from '../components/ui/Toast';
 import { SkeletonList } from '../components/ui/Skeleton';
 import { Avatar } from '../components/ui/Avatar';
+import { AvatarPickerModal } from '../components/ui/AvatarPickerModal';
 import { useNicknames } from '../context/NicknamesContext';
 import { getCached, setCached, clearCached } from '../utils/cache';
-import { LogOut, Trash2, Plus, Users, Split, X, Eye, EyeOff, KeyRound } from 'lucide-react';
+import { LogOut, Trash2, Plus, Users, Split, X, Eye, EyeOff, KeyRound, Pencil, Camera } from 'lucide-react';
 
 export default function DashboardPage() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const toast = useToast();
-  const { dn } = useNicknames();
+  const { dn, setOneNickname } = useNicknames();
 
   const GROUPS_KEY = `groups_${user?.email}`;
   const rawSeed    = getCached(GROUPS_KEY)?.data;
@@ -39,6 +40,13 @@ export default function DashboardPage() {
   const [changingPassword,   setChangingPassword]   = useState(false);
   const [showCurrentPass,    setShowCurrentPass]    = useState(false);
   const [showNewPass,        setShowNewPass]        = useState(false);
+  const [dashTab,             setDashTab]            = useState('groups');
+  // Nickname editing
+  const [editingNick,      setEditingNick]      = useState(null);
+  const [savingNick,       setSavingNick]       = useState(false);
+  // Avatar picker
+  const [showAvatarPicker, setShowAvatarPicker] = useState(false);
+  const [avatarVersion,    setAvatarVersion]    = useState(0);
 
   useEffect(() => {
     loadGroups();
@@ -111,6 +119,21 @@ export default function DashboardPage() {
     }
   };
 
+  const saveNickname = async () => {
+    if (!editingNick) return;
+    setSavingNick(true);
+    try {
+      await setGroupNickname(editingNick.groupId, editingNick.email, editingNick.value.trim());
+      setOneNickname(editingNick.email, editingNick.value.trim());
+      setEditingNick(null);
+      toast('Apodo guardado');
+    } catch (err) {
+      toast(err.message || 'Error al guardar apodo', 'error');
+    } finally {
+      setSavingNick(false);
+    }
+  };
+
   return (
     <div className="page">
       {/* Header */}
@@ -147,9 +170,9 @@ export default function DashboardPage() {
         </div>
       </header>
 
-      <div className="page-content">
+      <div className="page-content" style={{ paddingBottom: 60 }}>
         <div className="container">
-          {/* Widget estilo grande */}
+          {/* Título grande */}
           <div style={{ padding: '24px 0 8px', marginBottom: 16 }} className="animate-fade-in">
             <div style={{
               fontWeight: 900, fontSize: 'clamp(2.5rem, 12vw, 4rem)',
@@ -165,103 +188,254 @@ export default function DashboardPage() {
                 background: 'rgba(0, 0, 0, 0.04)',
                 color: 'var(--text-secondary)',
                 fontSize: '0.75rem', fontWeight: 600,
-              }}>Tus grupos de gastos compartidos</span>
+              }}>{dashTab === 'groups' ? 'Tus grupos de gastos compartidos' : 'Miembros de tus grupos'}</span>
             </div>
           </div>
 
-          {/* Lista de grupos */}
-          {loading ? (
-            <SkeletonList count={3} />
-          ) : groups.length === 0 ? (
-            <div className="empty-state animate-fade-in">
-              <div className="empty-state-icon"><Users size={48} strokeWidth={1.5} /></div>
-              <div className="empty-state-title">No tienes grupos aún</div>
-              <div className="empty-state-text">Crea tu primer grupo para empezar a registrar gastos</div>
-              <button
-                id="create-first-group-btn"
-                onClick={() => setShowCreateModal(true)}
-                style={{
-                  marginTop: 16, width: '100%', padding: '18px', borderRadius: 'var(--radius-md)',
-                  border: '2px dashed var(--text-muted)', background: 'transparent',
-                  cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  transition: 'all 0.2s ease',
-                }}
-                onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--primary)'; e.currentTarget.style.color = 'var(--primary)'; }}
-                onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--text-muted)'; e.currentTarget.style.color = 'var(--text-muted)'; }}
-              >
-                <Plus size={24} color="currentColor" strokeWidth={2} />
-              </button>
-            </div>
-          ) : (
-            <div className="list animate-fade-in">
-              {groups.map((g) => (
-                <div
-                  key={g.group_id}
-                  id={`group-${g.group_id}`}
-                  className="list-item card-interactive"
-                  style={{ paddingRight: 8 }}
-                >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 12, flex: 1, cursor: 'pointer' }}
-                    onClick={() => navigate(`/group/${g.group_id}`)}
-                    onKeyDown={(e) => e.key === 'Enter' && navigate(`/group/${g.group_id}`)}
-                    role="button" tabIndex={0}>
+          {/* ═══ TAB: GRUPOS ═══ */}
+          {dashTab === 'groups' && (
+            <>
+              {loading ? (
+                <SkeletonList count={3} />
+              ) : groups.length === 0 ? (
+                <div className="empty-state animate-fade-in">
+                  <div className="empty-state-icon"><Users size={48} strokeWidth={1.5} /></div>
+                  <div className="empty-state-title">No tienes grupos aún</div>
+                  <div className="empty-state-text">Crea tu primer grupo para empezar a registrar gastos</div>
+                  <button
+                    id="create-first-group-btn"
+                    onClick={() => setShowCreateModal(true)}
+                    style={{
+                      marginTop: 16, width: '100%', padding: '18px', borderRadius: 14,
+                      border: '2px dashed rgba(0,0,0,0.12)', background: 'transparent',
+                      cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      color: 'var(--text-muted)', transition: 'all 0.2s ease',
+                    }}
+                    onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--text-secondary)'; e.currentTarget.style.color = 'var(--text-secondary)'; }}
+                    onMouseLeave={e => { e.currentTarget.style.borderColor = 'rgba(0,0,0,0.12)'; e.currentTarget.style.color = 'var(--text-muted)'; }}
+                  >
+                    <Plus size={24} strokeWidth={2} />
+                  </button>
+                </div>
+              ) : (
+                <div className="animate-fade-in" style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                  {/* Lista de grupos — contenedor iOS */}
+                  <div style={{
+                    borderRadius: 16, overflow: 'hidden',
+                    background: 'var(--bg-card)',
+                    border: '1px solid rgba(0, 0, 0, 0.04)',
+                  }}>
+                    {groups.map((g, idx) => (
+                      <div
+                        key={g.group_id}
+                        id={`group-${g.group_id}`}
+                        style={{
+                          padding: '14px 16px',
+                          borderBottom: idx < groups.length - 1 ? '1px solid rgba(0,0,0,0.04)' : 'none',
+                          display: 'flex', alignItems: 'center',
+                          transition: 'background 0.15s ease',
+                        }}
+                        onMouseEnter={e => e.currentTarget.style.background = 'rgba(0,0,0,0.02)'}
+                        onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                      >
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 12, flex: 1, cursor: 'pointer' }}
+                          onClick={() => navigate(`/group/${g.group_id}`)}
+                          onKeyDown={(e) => e.key === 'Enter' && navigate(`/group/${g.group_id}`)}
+                          role="button" tabIndex={0}>
+                          <div style={{ display: 'flex', alignItems: 'center', flexShrink: 0 }}>
+                            {(g.memberEmails || []).slice(0, 3).map((email, i) => (
+                              <div key={email} style={{
+                                marginLeft: i === 0 ? 0 : -10,
+                                zIndex: 3 - i,
+                                borderRadius: '50%', position: 'relative',
+                              }}>
+                                <Avatar email={email} size="sm" />
+                              </div>
+                            ))}
+                            {(g.memberEmails || []).length > 3 && (
+                              <div style={{
+                                marginLeft: -10, zIndex: 0,
+                                width: 28, height: 28, borderRadius: '50%',
+                                background: 'var(--text-primary)',
+                                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                fontSize: '0.65rem', fontWeight: 700, color: '#fff',
+                              }}>
+                                +{g.memberEmails.length - 3}
+                              </div>
+                            )}
+                          </div>
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{ fontSize: '0.88rem', fontWeight: 600, color: 'var(--text-primary)' }}>{g.name}</div>
+                            <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontWeight: 400 }}>{g.memberCount || 0} miembros</div>
+                          </div>
+                        </div>
+                        <button
+                          title="Eliminar grupo"
+                          onClick={(e) => { e.stopPropagation(); setConfirmDelete({ group_id: g.group_id, name: g.name }); }}
+                          style={{
+                            background: 'none', border: 'none', cursor: 'pointer',
+                            padding: 6, borderRadius: 8, color: 'var(--text-muted)',
+                            flexShrink: 0, transition: 'all 0.2s ease',
+                          }}
+                          onMouseEnter={e => { e.currentTarget.style.color = 'var(--danger)'; e.currentTarget.style.background = 'rgba(255,59,48,0.08)'; }}
+                          onMouseLeave={e => { e.currentTarget.style.color = 'var(--text-muted)'; e.currentTarget.style.background = 'none'; }}
+                        ><Trash2 size={16} /></button>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Botón agregar grupo */}
+                  <button
+                    id="create-group-btn"
+                    onClick={() => setShowCreateModal(true)}
+                    style={{
+                      width: '100%', padding: '18px', borderRadius: 14,
+                      border: '2px dashed rgba(0,0,0,0.12)', background: 'transparent',
+                      cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      color: 'var(--text-muted)', transition: 'all 0.2s ease',
+                    }}
+                    onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--text-secondary)'; e.currentTarget.style.color = 'var(--text-secondary)'; }}
+                    onMouseLeave={e => { e.currentTarget.style.borderColor = 'rgba(0,0,0,0.12)'; e.currentTarget.style.color = 'var(--text-muted)'; }}
+                  >
+                    <Plus size={24} strokeWidth={2} />
+                  </button>
+                </div>
+              )}
+            </>
+          )}
+
+          {/* ═══ TAB: MIEMBROS ═══ */}
+          {dashTab === 'members' && (
+            <div className="animate-fade-in" style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+              {loading ? (
+                <SkeletonList count={3} />
+              ) : groups.length === 0 ? (
+                <div className="empty-state">
+                  <div className="empty-state-icon"><Users size={48} strokeWidth={1.5} /></div>
+                  <div className="empty-state-title">Sin miembros</div>
+                  <div className="empty-state-text">Crea un grupo para ver los miembros</div>
+                </div>
+              ) : (
+                groups.map((g) => (
+                  <div key={g.group_id}>
+                    {/* Sección header */}
                     <div style={{
-                      display: 'flex', alignItems: 'center', flexShrink: 0,
-                      paddingLeft: 4,
+                      fontSize: '0.72rem', color: 'var(--text-muted)', fontWeight: 600,
+                      textTransform: 'uppercase', letterSpacing: '0.06em',
+                      paddingLeft: 4, marginBottom: 8,
                     }}>
-                      {(g.memberEmails || []).slice(0, 3).map((email, i) => (
-                        <div key={email} style={{
-                          marginLeft: i === 0 ? 0 : -10,
-                          zIndex: 3 - i,
-                          borderRadius: '50%',
-                          position: 'relative',
-                        }}>
-                          <Avatar email={email} size="sm" />
-                        </div>
-                      ))}
-                      {(g.memberEmails || []).length > 3 && (
-                        <div style={{
-                          marginLeft: -10, zIndex: 0,
-                          width: 28, height: 28, borderRadius: '50%',
-                          background: 'var(--primary)',
-                          display: 'flex', alignItems: 'center', justifyContent: 'center',
-                          fontSize: '0.65rem', fontWeight: 700, color: '#fff',
-                        }}>
-                          +{g.memberEmails.length - 3}
-                        </div>
-                      )}
+                      Miembros de {g.name}
                     </div>
-                    <div className="list-item-content">
-                      <div className="list-item-title">{g.name}</div>
-                      <div className="list-item-subtitle">{g.memberCount || 0} miembros</div>
+                    <p style={{
+                      marginBottom: 10, paddingLeft: 4,
+                      display: 'flex', alignItems: 'center', gap: 4,
+                      fontSize: '0.72rem', color: 'var(--text-muted)', fontWeight: 500,
+                    }}>
+                      Toca <Pencil size={11} /> para ponerle un apodo
+                    </p>
+                    {/* Lista iOS */}
+                    <div style={{
+                      borderRadius: 16, overflow: 'hidden',
+                      background: 'var(--bg-card)',
+                      border: '1px solid rgba(0, 0, 0, 0.04)',
+                    }}>
+                      {(g.memberEmails || []).map((email, idx, arr) => {
+                        const isMe = email === user?.email;
+                        const nick = dn(email) !== email.split('@')[0] ? dn(email) : null;
+                        return (
+                          <div key={email} style={{
+                            padding: '14px 16px',
+                            borderBottom: idx < arr.length - 1 ? '1px solid rgba(0,0,0,0.04)' : 'none',
+                            display: 'flex', alignItems: 'center', gap: 12,
+                          }}>
+                            {/* Avatar */}
+                            {isMe ? (
+                              <div style={{ position: 'relative', flexShrink: 0, cursor: 'pointer' }}
+                                onClick={() => setShowAvatarPicker(true)} title="Personalizar mi avatar">
+                                <Avatar key={`av-${email}-${avatarVersion}`} email={email} />
+                                <div style={{
+                                  position: 'absolute', bottom: -2, right: -2,
+                                  width: 18, height: 18, borderRadius: '50%',
+                                  background: 'var(--text-primary)',
+                                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                  border: '2px solid var(--bg-card)',
+                                }}>
+                                  <Camera size={10} color="#fff" />
+                                </div>
+                              </div>
+                            ) : (
+                              <Avatar key={`av-${email}-${avatarVersion}`} email={email} />
+                            )}
+
+                            {/* Content */}
+                            <div style={{ flex: 1, minWidth: 0 }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 2 }}>
+                                <span style={{ fontSize: '0.88rem', fontWeight: 600, color: 'var(--text-primary)' }}>
+                                  {dn(email)}
+                                </span>
+                                {nick && (
+                                  <span style={{
+                                    fontSize: '0.62rem', color: 'var(--text-muted)',
+                                    background: 'rgba(0, 0, 0, 0.04)',
+                                    padding: '1px 7px', borderRadius: 6, fontWeight: 600,
+                                  }}>apodo</span>
+                                )}
+                              </div>
+                              <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontWeight: 400 }}>
+                                {email}
+                              </div>
+                            </div>
+
+                            {/* Pencil */}
+                            <button
+                              onClick={() => setEditingNick({ email, value: nick || '', groupId: g.group_id })}
+                              title="Editar apodo"
+                              style={{
+                                background: 'none', border: 'none', cursor: 'pointer',
+                                padding: 6, borderRadius: 8, color: 'var(--text-muted)',
+                                flexShrink: 0, transition: 'all 0.2s ease',
+                              }}
+                              onMouseEnter={e => { e.currentTarget.style.color = 'var(--text-primary)'; e.currentTarget.style.background = 'rgba(0,0,0,0.04)'; }}
+                              onMouseLeave={e => { e.currentTarget.style.color = 'var(--text-muted)'; e.currentTarget.style.background = 'none'; }}
+                            >
+                              <Pencil size={15} />
+                            </button>
+                          </div>
+                        );
+                      })}
                     </div>
                   </div>
-                  <button
-                    className="btn btn-ghost btn-icon"
-                    title="Eliminar grupo"
-                    onClick={(e) => { e.stopPropagation(); setConfirmDelete({ group_id: g.group_id, name: g.name }); }}
-                    style={{ color: 'var(--text-muted)', fontSize: '1rem', flexShrink: 0 }}
-                  ><Trash2 size={16} /></button>
-                </div>
-              ))}
-
-              {/* Botón agregar grupo — estilo card con borde punteado */}
-              <button
-                id="create-group-btn"
-                onClick={() => setShowCreateModal(true)}
-                style={{
-                  width: '100%', padding: '18px', borderRadius: 'var(--radius-md)',
-                  border: '2px dashed var(--text-muted)', background: 'transparent',
-                  cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  color: 'var(--text-muted)', transition: 'all 0.2s ease',
-                }}
-                onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--primary)'; e.currentTarget.style.color = 'var(--primary)'; }}
-                onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--text-muted)'; e.currentTarget.style.color = 'var(--text-muted)'; }}
-              >
-                <Plus size={24} strokeWidth={2} />
-              </button>
+                ))
+              )}
             </div>
           )}
+        </div>
+        {/* Tab bar fijo abajo — estilo pill como GroupPage */}
+        <div style={{
+          position: 'fixed', bottom: 0, left: 0, right: 0,
+          background: 'rgba(245, 245, 247, 0.9)',
+          backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)',
+          zIndex: 100, padding: '10px 16px 14px',
+        }}>
+          <div style={{
+            display: 'flex', maxWidth: 480, margin: '0 auto',
+            background: 'rgba(0, 0, 0, 0.04)', borderRadius: 14, padding: 4,
+          }}>
+            {['groups', 'members'].map(tab => (
+              <button key={tab} onClick={() => setDashTab(tab)}
+                style={{
+                  flex: 1, padding: '10px 0', border: 'none',
+                  borderRadius: 11, cursor: 'pointer', fontSize: '0.82rem',
+                  fontWeight: dashTab === tab ? 700 : 500,
+                  color: dashTab === tab ? 'var(--text-primary)' : 'var(--text-muted)',
+                  background: dashTab === tab ? '#fff' : 'transparent',
+                  boxShadow: dashTab === tab ? '0 1px 3px rgba(0,0,0,0.08)' : 'none',
+                  transition: 'all 0.2s ease',
+                }}>
+                {tab === 'groups' ? 'Grupos' : 'Miembros'}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 
@@ -466,6 +640,59 @@ export default function DashboardPage() {
             </button>
           </div>
         </form>
+      </Modal>
+
+      {/* Avatar picker */}
+      <AvatarPickerModal isOpen={showAvatarPicker} onClose={() => setShowAvatarPicker(false)}
+        email={user?.email || ''} onSaved={() => setAvatarVersion((v) => v + 1)} />
+
+      {/* Modal editar apodo */}
+      <Modal isOpen={!!editingNick} onClose={() => setEditingNick(null)} title="Editar apodo" centered>
+        {editingNick && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+            <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', textAlign: 'center' }}>{editingNick.email}</div>
+            <div className="input-group">
+              <label className="input-label" htmlFor="dash-nickname-input">Apodo (visible para todos)</label>
+              <input id="dash-nickname-input" className="input" type="text"
+                placeholder={editingNick.email.split('@')[0]}
+                value={editingNick.value} maxLength={20}
+                onChange={(e) => setEditingNick((prev) => ({ ...prev, value: e.target.value }))}
+                onKeyDown={(e) => e.key === 'Enter' && saveNickname()}
+                autoFocus />
+            </div>
+            {editingNick.value.trim() && (
+              <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', textAlign: 'center', marginTop: -8 }}>
+                Se mostrará como <strong style={{ color: 'var(--text-primary)' }}>{editingNick.value.trim()}</strong> para todos
+              </div>
+            )}
+            <div style={{ display: 'flex', gap: 10 }}>
+              <button
+                onClick={() => setEditingNick((p) => ({ ...p, value: '' }))}
+                disabled={savingNick || !editingNick.value}
+                style={{
+                  flex: 1, padding: '12px', borderRadius: 12,
+                  border: '1.5px solid rgba(0,0,0,0.08)', background: 'transparent',
+                  color: 'var(--text-primary)', fontSize: '0.85rem', fontWeight: 600,
+                  cursor: 'pointer', opacity: editingNick.value ? 1 : 0.4,
+                }}>
+                Quitar apodo
+              </button>
+              <button
+                onClick={saveNickname}
+                disabled={savingNick || (!editingNick.value.trim())}
+                style={{
+                  flex: 2, padding: '12px', borderRadius: 12, border: 'none',
+                  background: (!editingNick.value.trim()) ? 'rgba(0,0,0,0.06)' : 'var(--text-primary)',
+                  color: (!editingNick.value.trim()) ? 'var(--text-muted)' : '#fff',
+                  fontSize: '0.85rem', fontWeight: 700,
+                  cursor: savingNick ? 'wait' : 'pointer',
+                  transition: 'all 0.2s ease',
+                }}>
+                {savingNick ? 'Guardando...' : 'Guardar'}
+              </button>
+            </div>
+          </div>
+        )}
       </Modal>
     </div>
   );
