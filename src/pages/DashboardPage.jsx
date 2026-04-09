@@ -10,7 +10,7 @@ import { Avatar } from '../components/ui/Avatar';
 import { AvatarPickerModal } from '../components/ui/AvatarPickerModal';
 import { useNicknames } from '../context/NicknamesContext';
 import { getCached, setCached, clearCached } from '../utils/cache';
-import { LogOut, Trash2, Plus, Users, Split, X, Eye, EyeOff, KeyRound, Pencil, Camera } from 'lucide-react';
+import { LogOut, Trash2, Plus, Users, User, Split, X, Eye, EyeOff, KeyRound, Pencil, Camera } from 'lucide-react';
 
 export default function DashboardPage() {
   const { user, logout } = useAuth();
@@ -440,7 +440,7 @@ export default function DashboardPage() {
       </div>
 
       {/* Modal crear grupo */}
-      <Modal isOpen={showCreateModal} onClose={() => setShowCreateModal(false)} title="Nuevo grupo">
+      <Modal isOpen={showCreateModal} onClose={() => setShowCreateModal(false)} title="Nuevo grupo" centered fullscreen>
         <form onSubmit={handleCreateGroup} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
           {/* Nombre del grupo */}
           <div className="input-group">
@@ -458,64 +458,86 @@ export default function DashboardPage() {
           </div>
 
           {/* Miembros */}
-          <div className="input-group">
-            <label className="input-label">Agregar miembros (opcional)</label>
-            <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginBottom: 8, lineHeight: 1.4 }}>
-              Se creará una cuenta para cada miembro. Comparte el email y contraseña con ellos.
-            </p>
+          {(() => {
+            const hasMembersAdded = members.some((m) => m.email.trim() !== '');
+            return (
+              <div className="input-group">
+                <label className="input-label">Miembros</label>
+                <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginBottom: 8, lineHeight: 1.4 }}>
+                  Agrega a las personas con las que compartirás gastos. Se creará una cuenta para cada uno.
+                </p>
 
-            {members.map((m, i) => (
-              <div key={i} style={{ display: 'flex', flexDirection: 'column', gap: 6,
-                background: 'var(--bg-secondary)', borderRadius: 10, padding: '10px 12px',
-                marginBottom: 8, border: '1px solid var(--border)' }}>
+                {members.map((m, i) => (
+                  <div key={i} style={{ display: 'flex', flexDirection: 'column', gap: 6,
+                    background: 'var(--bg-secondary)', borderRadius: 10, padding: '10px 12px',
+                    marginBottom: 8, border: '1px solid var(--border)' }}>
 
-                {/* Fila email + botón quitar */}
-                <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                  <input
-                    id={`member-email-${i}`}
-                    className="input"
-                    type="email"
-                    placeholder="email@ejemplo.com"
-                    value={m.email}
-                    onChange={(e) => updateMember(i, 'email', e.target.value)}
-                    style={{ flex: 1 }}
-                  />
-                  {members.length > 1 && (
-                    <button type="button" className="btn btn-ghost btn-icon"
-                      onClick={() => removeMember(i)} aria-label="Quitar">
-                      <X size={16} />
-                    </button>
-                  )}
-                </div>
+                    {/* Fila email + botón quitar */}
+                    <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                      <input
+                        id={`member-email-${i}`}
+                        className="input"
+                        type="email"
+                        placeholder="email@ejemplo.com"
+                        value={m.email}
+                        onChange={(e) => updateMember(i, 'email', e.target.value)}
+                        style={{ flex: 1 }}
+                      />
+                      {members.length > 1 && (
+                        <button type="button" className="btn btn-ghost btn-icon"
+                          onClick={() => removeMember(i)} aria-label="Quitar">
+                          <X size={16} />
+                        </button>
+                      )}
+                    </div>
 
-                {/* Contraseña temporal */}
-                <div style={{ position: 'relative' }}>
-                  <input
-                    id={`member-pass-${i}`}
-                    className="input"
-                    type={showPassIdx === i ? 'text' : 'password'}
-                    placeholder="Contraseña temporal (mín. 6 caracteres)"
-                    value={m.password}
-                    onChange={(e) => updateMember(i, 'password', e.target.value)}
-                    minLength={6}
-                    style={{ paddingRight: 40 }}
-                  />
-                  <button type="button"
-                    onClick={() => setShowPassIdx(showPassIdx === i ? null : i)}
-                    style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)',
-                      background: 'none', border: 'none', cursor: 'pointer',
-                      color: 'var(--text-muted)', fontSize: '1rem' }}>
-                    {showPassIdx === i ? <EyeOff size={18} /> : <Eye size={18} />}
-                  </button>
-                </div>
+                    {/* Contraseña temporal */}
+                    <div style={{ position: 'relative' }}>
+                      <input
+                        id={`member-pass-${i}`}
+                        className="input"
+                        type={showPassIdx === i ? 'text' : 'password'}
+                        placeholder="Contraseña temporal (mín. 6 caracteres)"
+                        value={m.password}
+                        onChange={(e) => updateMember(i, 'password', e.target.value)}
+                        minLength={6}
+                        style={{ paddingRight: 40 }}
+                      />
+                      <button type="button"
+                        onClick={() => setShowPassIdx(showPassIdx === i ? null : i)}
+                        style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)',
+                          background: 'none', border: 'none', cursor: 'pointer',
+                          color: 'var(--text-muted)', fontSize: '1rem' }}>
+                        {showPassIdx === i ? <EyeOff size={18} /> : <Eye size={18} />}
+                      </button>
+                    </div>
+                  </div>
+                ))}
+
+                <button type="button" className="btn btn-secondary btn-sm"
+                  onClick={addMember} style={{ alignSelf: 'flex-start' }}>
+                  + Agregar otro
+                </button>
+
+                {/* Hint dinámico */}
+                {!hasMembersAdded && (
+                  <div style={{
+                    display: 'flex', alignItems: 'center', gap: 10,
+                    padding: '12px 14px', borderRadius: 12,
+                    background: 'rgba(255, 149, 0, 0.06)',
+                    border: '1px solid rgba(255, 149, 0, 0.12)',
+                    marginTop: 4,
+                    animation: 'fadeIn 0.3s ease',
+                  }}>
+                    <User size={16} style={{ color: 'var(--warning)', flexShrink: 0 }} />
+                    <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', lineHeight: 1.4 }}>
+                      Sin miembros, se creará un registro de <strong style={{ color: 'var(--text-primary)' }}>gastos individuales</strong> solo para ti.
+                    </span>
+                  </div>
+                )}
               </div>
-            ))}
-
-            <button type="button" className="btn btn-secondary btn-sm"
-              onClick={addMember} style={{ alignSelf: 'flex-start' }}>
-              + Agregar otro
-            </button>
-          </div>
+            );
+          })()}
 
           {/* Botones */}
           <div style={{ display: 'flex', gap: 10 }}>
@@ -525,7 +547,7 @@ export default function DashboardPage() {
             </button>
             <button id="confirm-create-group-btn" type="submit"
               className="btn btn-primary" style={{ flex: 1 }} disabled={creating}>
-              {creating ? 'Creando...' : 'Crear grupo'}
+              {creating ? 'Creando...' : members.some((m) => m.email.trim()) ? 'Crear grupo' : 'Crear registro'}
             </button>
           </div>
         </form>
