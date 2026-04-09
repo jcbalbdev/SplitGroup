@@ -150,8 +150,8 @@ export default function DashboardPage() {
       <header className="header">
         <div className="header-inner">
           <div className="logo">
-            <div className="logo-icon"><Split size={20} /></div>
-            <span className="logo-text">SplitGroup</span>
+            <img src="/logokicoin.png" alt="KiCode" style={{ width: 28, height: 28, borderRadius: 8, objectFit: 'cover' }} />
+            <span className="logo-text">KiCode</span>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
             {/* Notificaciones */}

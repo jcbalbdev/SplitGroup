@@ -45,7 +45,7 @@ function InstallInstructions({ device }) {
     return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
         <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', textAlign: 'center', lineHeight: 1.5 }}>
-          Para instalar SplitGroup necesitas abrir esta página en <strong>Safari</strong>.
+          Para instalar KiCode necesitas abrir esta página en <strong>Safari</strong>.
         </p>
         <div style={stepStyle}><div style={numStyle}>1</div><span style={textStyle}>Copia la URL de esta página</span></div>
         <div style={stepStyle}><div style={numStyle}>2</div><span style={textStyle}>Ábrela en Safari</span></div>
@@ -73,7 +73,7 @@ function InstallInstructions({ device }) {
     return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
         <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', textAlign: 'center', lineHeight: 1.5 }}>
-          Para instalar SplitGroup, abre esta página en <strong>Google Chrome</strong>.
+          Para instalar KiCode, abre esta página en <strong>Google Chrome</strong>.
         </p>
         <div style={stepStyle}><div style={numStyle}>1</div><span style={textStyle}>Copia la URL de esta página</span></div>
         <div style={stepStyle}><div style={numStyle}>2</div><span style={textStyle}>Ábrela en Chrome</span></div>
@@ -162,14 +162,13 @@ export default function LoginPage() {
   // ── Logo ──
   const Logo = () => (
     <div style={{ display:'flex', flexDirection:'column', alignItems:'center', gap:12, marginBottom:40 }}>
-      <div style={{
-        width:48, height:48, borderRadius:14,
-        background:'rgba(0, 0, 0, 0.04)', display:'flex', alignItems:'center', justifyContent:'center',
-      }}>
-        <Split size={24} color="var(--text-primary)" strokeWidth={2.5} />
-      </div>
+      <img
+        src="/logokicoin.png"
+        alt="KiCode"
+        style={{ width:64, height:64, borderRadius:18, objectFit:'cover' }}
+      />
       <span style={{ fontSize:'1.3rem', fontWeight:800, color:'var(--text-primary)', letterSpacing:'-0.02em' }}>
-        SplitGroup
+        KiCode
       </span>
     </div>
   );
@@ -313,7 +312,7 @@ export default function LoginPage() {
             onMouseEnter={e => e.currentTarget.style.color = 'var(--text-secondary)'}
             onMouseLeave={e => e.currentTarget.style.color = 'var(--text-muted)'}
           >
-            <Download size={14} /> Instalar SplitGroup en tu dispositivo
+            <Download size={14} /> Instalar KiCode en tu dispositivo
           </button>
         )}
       </div>

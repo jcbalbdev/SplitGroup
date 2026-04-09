@@ -41,12 +41,22 @@ function Receipt({ item, groupName }) {
     }}>
       {/* Header */}
       <div style={{ textAlign: 'center', marginBottom: 20 }}>
-        <div style={{ fontSize: '1.8rem', marginBottom: 4 }}>💸</div>
-        <div style={{ fontWeight: 800, fontSize: '1rem', color: '#7c5cfc', letterSpacing: '-0.01em' }}>
-          SplitGroup
-        </div>
+        <img
+          src="/logokicoin.png"
+          alt="KiCode"
+          crossOrigin="anonymous"
+          style={{
+            width: 64,
+            height: 64,
+            borderRadius: 16,
+            objectFit: 'cover',
+            marginBottom: 8,
+            display: 'block',
+            margin: '0 auto 8px',
+          }}
+        />
         {groupName && (
-          <div style={{ fontSize: '0.78rem', color: '#888', marginTop: 2 }}>{groupName}</div>
+          <div style={{ fontSize: '0.78rem', color: '#888', marginTop: 4 }}>{groupName}</div>
         )}
       </div>
 
@@ -125,7 +135,7 @@ function Receipt({ item, groupName }) {
 
       {/* Footer */}
       <div style={{ borderTop: '1.5px dashed #e0e0e0', marginTop: 16, paddingTop: 12, textAlign: 'center', fontSize: '0.72rem', color: '#bbb' }}>
-        Generado con SplitGroup · splitgroup.app
+        Generado con KiCode · kicode.app
       </div>
     </div>
   );
@@ -163,7 +173,9 @@ export function ExpenseDetailModal({ isOpen, onClose, item, groupName, onEdit, o
       const canvas = await html2canvas(receiptRef.current, {
         scale: 3,
         useCORS: true,
+        allowTaint: true,
         backgroundColor: '#ffffff',
+        imageTimeout: 0,
       });
 
       canvas.toBlob(async (blob) => {
@@ -173,7 +185,7 @@ export function ExpenseDetailModal({ isOpen, onClose, item, groupName, onEdit, o
           const file = new File([blob], filename, { type: 'image/png' });
           await navigator.share({
             title: `Gasto: ${desc}`,
-            text: `Registro de gasto en SplitGroup\n${desc} — ${formatAmount(total)}`,
+            text: `Registro de gasto en KiCode\n${desc} — ${formatAmount(total)}`,
             files: [file],
           });
         } else {
