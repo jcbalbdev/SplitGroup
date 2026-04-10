@@ -25,18 +25,6 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="KiCode" />
 
-    <!-- OneSignal Push Notifications -->
-    <script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js" defer></script>
-    <script>
-      window.OneSignalDeferred = window.OneSignalDeferred || [];
-      OneSignalDeferred.push(async function(OneSignal) {
-        await OneSignal.init({
-          appId: "964ef142-ad4c-40ef-a27b-b94de919baa3",
-          serviceWorkerParam: { scope: "/" },
-          serviceWorkerPath: "/OneSignalSDKWorker.js",
-        });
-      });
-    </script>
   </head>
   <body>
     <div id="root"></div>
