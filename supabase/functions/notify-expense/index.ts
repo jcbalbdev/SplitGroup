@@ -58,7 +58,7 @@ Deno.serve(async (req) => {
     const { data: group } = await supabase
       .from("groups")
       .select("name")
-      .eq("id", record.group_id)
+      .eq("group_id", record.group_id)
       .single();
 
     // 2. paid_by ya es un email directo (ej: "d.moromisato90@gmail.com")
@@ -68,9 +68,9 @@ Deno.serve(async (req) => {
     // 3. Obtener otros miembros del grupo (excluyendo quien pagó)
     const { data: members } = await supabase
       .from("group_members")
-      .select("email")
+      .select("user_email")
       .eq("group_id", record.group_id)
-      .neq("email", payerEmail);
+      .neq("user_email", payerEmail);
 
     if (!members || members.length === 0) {
       return new Response(JSON.stringify({ message: "No members to notify" }), {
@@ -84,15 +84,15 @@ Deno.serve(async (req) => {
     // 5. Buscar subscription IDs activos para cada miembro
     const allSubscriptionIds: string[] = [];
     for (const member of members) {
-      if (member.email) {
-        const ids = await getActiveSubscriptionIds(member.email);
+      if (member.user_email) {
+        const ids = await getActiveSubscriptionIds(member.user_email);
         allSubscriptionIds.push(...ids);
       }
     }
 
     if (allSubscriptionIds.length === 0) {
       return new Response(
-        JSON.stringify({ message: "No active push subscriptions", members: members.map(m => m.email) }),
+        JSON.stringify({ message: "No active push subscriptions", members: members.map(m => m.user_email) }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
