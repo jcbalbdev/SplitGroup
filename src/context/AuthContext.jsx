@@ -1,7 +1,6 @@
 // src/context/AuthContext.jsx
 import { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { supabase } from '../services/supabase';
-import OneSignal from 'react-onesignal';
 
 const AuthContext = createContext(null);
 
@@ -69,10 +68,12 @@ export function AuthProvider({ children }) {
             });
             // Asociar dispositivo en OneSignal al cargar sesión existente
             try {
-              await OneSignal.login(session.user.email);
-              if (Notification.permission === 'granted') {
-                await OneSignal.User.PushSubscription.optIn();
-              }
+              window.OneSignalDeferred?.push(async (OneSignal) => {
+                await OneSignal.login(session.user.email);
+                if (Notification.permission === 'granted') {
+                  await OneSignal.User.PushSubscription.optIn();
+                }
+              });
             } catch (_) {}
           }
         }
@@ -130,14 +131,16 @@ export function AuthProvider({ children }) {
     setUser(userData);
     // Asociar dispositivo con usuario en OneSignal
     try {
-      OneSignal.login(userData.email);
-      if (Notification.permission === 'granted') {
-        OneSignal.User.PushSubscription.optIn();
-      }
+      window.OneSignalDeferred?.push(async (OneSignal) => {
+        await OneSignal.login(userData.email);
+        if (Notification.permission === 'granted') {
+          await OneSignal.User.PushSubscription.optIn();
+        }
+      });
     } catch (_) {}
   }, []);
   const logout = useCallback(async () => {
-    try { await OneSignal.logout(); } catch (_) {}
+    try { window.OneSignalDeferred?.push(async (OneSignal) => { await OneSignal.logout(); }); } catch (_) {}
     await supabase.auth.signOut();
     setUser(null);
   }, []);
