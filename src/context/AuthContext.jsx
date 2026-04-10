@@ -66,6 +66,8 @@ export function AuthProvider({ children }) {
               email: session.user.email,
               name:  profile?.name || session.user.email.split('@')[0],
             });
+            // Asociar dispositivo en OneSignal al cargar sesión existente
+            try { window.OneSignalDeferred?.push(async (OneSignal) => { await OneSignal.login(session.user.email); }); } catch (_) {}
           }
         }
       } catch (err) {
@@ -118,8 +120,13 @@ export function AuthProvider({ children }) {
     };
   }, []);
 
-  const login  = useCallback((userData) => setUser(userData), []);
+  const login  = useCallback((userData) => {
+    setUser(userData);
+    // Asociar dispositivo con usuario en OneSignal
+    try { window.OneSignalDeferred?.push(async (OneSignal) => { await OneSignal.login(userData.email); }); } catch (_) {}
+  }, []);
   const logout = useCallback(async () => {
+    try { window.OneSignalDeferred?.push(async (OneSignal) => { await OneSignal.logout(); }); } catch (_) {}
     await supabase.auth.signOut();
     setUser(null);
   }, []);
