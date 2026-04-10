@@ -19,13 +19,10 @@ async function getActiveSubscriptionIds(email: string): Promise<string[]> {
   try {
     const res = await fetch(
       `https://api.onesignal.com/apps/${ONESIGNAL_APP_ID}/users/by/external_id/${encodeURIComponent(email)}`,
-      {
-        headers: { Authorization: `Key ${ONESIGNAL_API_KEY}` },
-      }
+      { headers: { Authorization: `Key ${ONESIGNAL_API_KEY}` } }
     );
     if (!res.ok) return [];
     const user = await res.json();
-    // Filtrar solo suscripciones habilitadas con token válido
     return (user.subscriptions || [])
       .filter((s: any) => s.enabled && s.token)
       .map((s: any) => s.id);
@@ -34,17 +31,20 @@ async function getActiveSubscriptionIds(email: string): Promise<string[]> {
   }
 }
 
+// Obtener nombre corto del email (parte antes del @)
+function shortName(email: string): string {
+  return email?.split("@")[0] || "Alguien";
+}
+
 Deno.serve(async (req) => {
-  // Handle CORS preflight
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
   }
 
   try {
     const payload = await req.json();
-
-    // El webhook de Supabase envía: { type, table, record, old_record }
     const record = payload.record;
+
     if (!record) {
       return new Response(JSON.stringify({ error: "No record found" }), {
         status: 400,
@@ -54,26 +54,23 @@ Deno.serve(async (req) => {
 
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
-    // 1. Obtener info del grupo
+    // 1. Obtener nombre del grupo
     const { data: group } = await supabase
       .from("groups")
       .select("name")
       .eq("id", record.group_id)
       .single();
 
-    // 2. Obtener el email de quien pagó (paid_by)
-    const { data: payer } = await supabase
-      .from("group_members")
-      .select("email")
-      .eq("id", record.paid_by)
-      .single();
+    // 2. paid_by ya es un email directo (ej: "d.moromisato90@gmail.com")
+    const payerEmail = record.paid_by;
+    const payerName = shortName(payerEmail);
 
-    // 3. Obtener todos los miembros del grupo EXCEPTO quien pagó
+    // 3. Obtener otros miembros del grupo (excluyendo quien pagó)
     const { data: members } = await supabase
       .from("group_members")
       .select("email")
       .eq("group_id", record.group_id)
-      .neq("id", record.paid_by);
+      .neq("email", payerEmail);
 
     if (!members || members.length === 0) {
       return new Response(JSON.stringify({ message: "No members to notify" }), {
@@ -81,13 +78,10 @@ Deno.serve(async (req) => {
       });
     }
 
-    // 4. Preparar el nombre del pagador (usar parte antes del @)
-    const payerName = payer?.email?.split("@")[0] || "Alguien";
-
-    // 5. Formatear el monto
+    // 4. Formatear el monto
     const amount = parseFloat(record.amount || 0).toFixed(2);
 
-    // 6. Buscar subscription IDs activos para cada miembro
+    // 5. Buscar subscription IDs activos para cada miembro
     const allSubscriptionIds: string[] = [];
     for (const member of members) {
       if (member.email) {
@@ -98,19 +92,22 @@ Deno.serve(async (req) => {
 
     if (allSubscriptionIds.length === 0) {
       return new Response(
-        JSON.stringify({ message: "No active subscriptions found for members" }),
+        JSON.stringify({ message: "No active push subscriptions", members: members.map(m => m.email) }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    // 7. Enviar notificación via OneSignal usando subscription IDs
+    // 6. Formato de notificación similar a la in-app:
+    //    Título: "d.moromisato90 · S/.10.00"
+    //    Cuerpo: "Registró un gasto en karencios: prueba"
+    const groupName = group?.name || "KiCode";
+    const description = record.description ? `: ${record.description}` : "";
+
     const notification = {
       app_id: ONESIGNAL_APP_ID,
       include_subscription_ids: allSubscriptionIds,
-      headings: { en: group?.name || "KiCode" },
-      contents: {
-        en: `${payerName} registró un gasto de S/.${amount}${record.description ? `: ${record.description}` : ""}`,
-      },
+      headings: { en: `${payerName} · S/.${amount}` },
+      contents: { en: `Registró un gasto en ${groupName}${description}` },
       url: `https://kicodeapp.vercel.app/group/${record.group_id}`,
     };
 
