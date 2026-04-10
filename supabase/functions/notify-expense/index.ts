@@ -14,6 +14,26 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+// Buscar subscription IDs activos de un usuario por su external_id (email)
+async function getActiveSubscriptionIds(email: string): Promise<string[]> {
+  try {
+    const res = await fetch(
+      `https://api.onesignal.com/apps/${ONESIGNAL_APP_ID}/users/by/external_id/${encodeURIComponent(email)}`,
+      {
+        headers: { Authorization: `Key ${ONESIGNAL_API_KEY}` },
+      }
+    );
+    if (!res.ok) return [];
+    const user = await res.json();
+    // Filtrar solo suscripciones habilitadas con token válido
+    return (user.subscriptions || [])
+      .filter((s: any) => s.enabled && s.token)
+      .map((s: any) => s.id);
+  } catch {
+    return [];
+  }
+}
+
 Deno.serve(async (req) => {
   // Handle CORS preflight
   if (req.method === "OPTIONS") {
@@ -67,13 +87,26 @@ Deno.serve(async (req) => {
     // 5. Formatear el monto
     const amount = parseFloat(record.amount || 0).toFixed(2);
 
-    // 6. Enviar notificación via OneSignal
-    const aliases = members.map((m: { email: string }) => m.email);
+    // 6. Buscar subscription IDs activos para cada miembro
+    const allSubscriptionIds: string[] = [];
+    for (const member of members) {
+      if (member.email) {
+        const ids = await getActiveSubscriptionIds(member.email);
+        allSubscriptionIds.push(...ids);
+      }
+    }
 
+    if (allSubscriptionIds.length === 0) {
+      return new Response(
+        JSON.stringify({ message: "No active subscriptions found for members" }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // 7. Enviar notificación via OneSignal usando subscription IDs
     const notification = {
       app_id: ONESIGNAL_APP_ID,
-      include_aliases: { external_id: aliases },
-      target_channel: "push",
+      include_subscription_ids: allSubscriptionIds,
       headings: { en: group?.name || "KiCode" },
       contents: {
         en: `${payerName} registró un gasto de S/.${amount}${record.description ? `: ${record.description}` : ""}`,
